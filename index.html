@@ -36,6 +36,14 @@
 </style>
 </head>
 <body>
+<div id="login-gate" style="position:fixed;inset:0;background:linear-gradient(135deg,#2d3277,#1864ab);display:flex;align-items:center;justify-content:center;z-index:9999;flex-direction:column;gap:14px;padding:20px">
+  <div style="font-size:48px">🔒</div>
+  <h2 style="color:#fff;font-size:22px;font-weight:700">Bipador de Pacotes</h2>
+  <div style="color:#dde7ff;font-size:13px">Digite a senha para entrar</div>
+  <input type="password" id="login-input" placeholder="Senha" autocomplete="current-password" style="padding:14px 20px;font-size:18px;border-radius:8px;border:3px solid transparent;width:240px;text-align:center;font-family:monospace">
+  <button id="login-btn" style="padding:12px 32px;font-size:16px;background:#fff;color:#2d3277;border:none;border-radius:8px;cursor:pointer;font-weight:700">Entrar</button>
+  <div id="login-erro" style="color:#ffd2d2;min-height:20px;font-size:14px;font-weight:600"></div>
+</div>
 <div class="wrap">
   <h1>📦 Bipar Pacote → Prateleira</h1>
   <div class="sub">Bipa pacote, bipa QR da prateleira, salva sozinho.</div>
@@ -65,11 +73,52 @@
 
   <div class="config">
     <a onclick="configurar()">⚙️ Configurar URL do script</a>
-    &nbsp;·&nbsp; <span style="color:#adb5bd">v4 (audio fix)</span>
+    &nbsp;·&nbsp; <span style="color:#adb5bd">v6 (scanner fix)</span>
   </div>
 </div>
 
 <script>
+// ===== GATE DE SENHA =====
+// Hash SHA-256 da senha (não armazenamos a senha em texto puro).
+// Senha atual: 000000
+const SENHA_HASH = '91b4d142823f7d20c5f08df69122de43f35f057a988d9619f6d3138485c9a203';
+const AUTH_KEY = 'bipador-auth-v1';
+
+async function _sha256(str) {
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(str));
+  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2,'0')).join('');
+}
+
+async function _entrar() {
+  const inp = document.getElementById('login-input');
+  const erro = document.getElementById('login-erro');
+  const hash = await _sha256(inp.value);
+  if (hash === SENHA_HASH) {
+    sessionStorage.setItem(AUTH_KEY, hash);
+    document.getElementById('login-gate').style.display = 'none';
+    const p = document.getElementById('pacote');
+    if (p) p.focus();
+  } else {
+    erro.textContent = '❌ Senha incorreta';
+    inp.value = '';
+    inp.focus();
+  }
+}
+
+(function _initGate() {
+  const gate = document.getElementById('login-gate');
+  if (sessionStorage.getItem(AUTH_KEY) === SENHA_HASH) {
+    gate.style.display = 'none';
+    return;
+  }
+  const inp = document.getElementById('login-input');
+  const btn = document.getElementById('login-btn');
+  btn.addEventListener('click', _entrar);
+  inp.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); _entrar(); } });
+  setTimeout(() => inp.focus(), 100);
+})();
+
+// ===== APP =====
 const PRATELEIRAS_VALIDAS = [
   '(L2) Prat 1','(L2) Prat 2','(L2) Prat 3','(L2) Prat 4','(L2) Prat 5',
   '(L2) Prat 6','(L2) Prat 7','(L2) Prat 8','(L2) Prat 9','(L2) Prat 10',
@@ -117,18 +166,34 @@ function reset() {
   inP.focus();
 }
 
+// Atualiza apenas o visual conforme o usuário digita / leitor bipa.
+// NÃO movemos o foco automaticamente: senão o leitor de código de barras
+// (que digita 30+ chars em ms) perde caracteres pro campo seguinte.
 inP.addEventListener('input', () => {
   const v = inP.value.trim();
   if (v.length >= 3) {
-    inP.classList.add('ok'); s1.classList.add('done'); s2.style.opacity = '1';
+    inP.classList.add('ok');
+    s1.classList.add('done');
+    s2.style.opacity = '1';
     inS.disabled = false;
-    setFeedback('idle', 'Agora bipe o QR da prateleira…');
-    inS.focus();
+  } else {
+    inP.classList.remove('ok');
   }
 });
 
+// Avança APENAS quando o usuário/leitor envia Enter (suffix padrão dos scanners).
+function _avancarParaPrateleira() {
+  if (inP.value.trim().length === 0) return;
+  inP.classList.add('ok');
+  s1.classList.add('done');
+  s2.style.opacity = '1';
+  inS.disabled = false;
+  setFeedback('idle', 'Agora bipe o QR da prateleira…');
+  setTimeout(() => inS.focus(), 30);
+}
+
 inP.addEventListener('keydown', (e) => {
-  if (e.key === 'Enter') { e.preventDefault(); if (inP.value.trim().length >= 3) inS.focus(); }
+  if (e.key === 'Enter' || e.key === 'Tab') { e.preventDefault(); _avancarParaPrateleira(); }
 });
 
 function validarPrateleira(valor) {
