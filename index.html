@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<title>Bipar Pacote → Prateleira</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, Segoe UI, Roboto, sans-serif; background: #f1f3f5; min-height: 100vh; padding: 20px; }
+  .wrap { max-width: 600px; margin: 0 auto; }
+  h1 { color: #2d3277; margin-bottom: 4px; font-size: 22px; }
+  .sub { color: #868e96; font-size: 13px; margin-bottom: 20px; }
+  .card { background: #fff; padding: 24px; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); margin-bottom: 16px; }
+  .step { font-size: 13px; color: #1864ab; background: #e7f5ff; padding: 8px 12px; border-radius: 6px; font-weight: 600; margin-bottom: 8px; display: inline-block; }
+  .step.done { background: #d3f9d8; color: #2b8a3e; }
+  input { width: 100%; padding: 16px; font-size: 20px; border: 3px solid #dee2e6; border-radius: 8px; font-family: monospace; }
+  input:focus { outline: none; border-color: #3483fa; }
+  input.ok { border-color: #00a650; background: #f0fff4; }
+  input.invalid { border-color: #c92a2a; background: #fff5f5; }
+  input:disabled { background: #f1f3f5; }
+  .feedback { padding: 16px; border-radius: 8px; font-weight: 700; text-align: center; font-size: 16px; margin-top: 12px; min-height: 60px; display: flex; align-items: center; justify-content: center; }
+  .feedback.success { background: #d3f9d8; color: #2b8a3e; }
+  .feedback.error { background: #ffe3e3; color: #c92a2a; }
+  .feedback.warn { background: #fff9db; color: #846503; }
+  .feedback.idle { background: #f8f9fa; color: #adb5bd; }
+  .stats { display: flex; gap: 12px; margin-top: 16px; }
+  .stat { flex: 1; background: #fff; padding: 12px; border-radius: 8px; text-align: center; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
+  .stat .n { font-size: 20px; font-weight: 700; color: #2d3277; word-break: break-word; }
+  .stat .l { font-size: 11px; color: #868e96; }
+  .config { font-size: 12px; color: #adb5bd; margin-top: 20px; text-align: center; }
+  .config a { color: #3483fa; cursor: pointer; }
+  .log { background: #fff; border-radius: 8px; padding: 12px; max-height: 240px; overflow-y: auto; font-size: 13px; }
+  .log-item { padding: 8px; border-bottom: 1px solid #f1f3f5; display: flex; justify-content: space-between; gap: 8px; align-items: center; }
+  .log-item:last-child { border-bottom: none; }
+  .log-item .code { font-family: monospace; color: #495057; word-break: break-all; }
+  .log-item .pr { background: #2d3277; color: #fff; padding: 4px 8px; border-radius: 4px; font-weight: 700; flex-shrink: 0; font-size: 12px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>📦 Bipar Pacote → Prateleira</h1>
+  <div class="sub">Bipa pacote, bipa QR da prateleira, salva sozinho.</div>
+
+  <div class="card">
+    <div class="step" id="s1">1. Pacote</div>
+    <input type="text" id="pacote" placeholder="Bipe o código do pacote" autocomplete="off" autofocus>
+    <div style="height: 14px"></div>
+    <div class="step" id="s2" style="opacity:0.4">2. Prateleira (bipe o QR)</div>
+    <input type="text" id="prateleira" placeholder="Bipe o QR da prateleira" autocomplete="off" disabled>
+    <div class="feedback idle" id="fb">Aguardando bip do pacote…</div>
+  </div>
+
+  <div class="stats">
+    <div class="stat"><div class="n" id="ct">0</div><div class="l">Bipados nesta sessão</div></div>
+    <div class="stat"><div class="n" id="ult">—</div><div class="l">Última prateleira</div></div>
+  </div>
+
+  <div style="margin-top:16px"><div class="step" style="background:#f1f3f5;color:#495057">📋 Histórico desta sessão</div></div>
+  <div class="log" id="log"><div style="color:#adb5bd;text-align:center;padding:20px">Nada ainda…</div></div>
+
+  <div style="margin-top:16px;display:flex;gap:8px;justify-content:center">
+    <button onclick="beep('ok')" style="padding:8px 12px;border:1px solid #2b8a3e;background:#d3f9d8;color:#2b8a3e;border-radius:6px;cursor:pointer;font-weight:600">🔊 Testar sucesso</button>
+    <button onclick="beep('warn')" style="padding:8px 12px;border:1px solid #846503;background:#fff9db;color:#846503;border-radius:6px;cursor:pointer;font-weight:600">🔊 Testar aviso</button>
+    <button onclick="beep('err')" style="padding:8px 12px;border:1px solid #c92a2a;background:#ffe3e3;color:#c92a2a;border-radius:6px;cursor:pointer;font-weight:600">🔊 Testar erro</button>
+  </div>
+
+  <div class="config">
+    <a onclick="configurar()">⚙️ Configurar URL do script</a>
+    &nbsp;·&nbsp; <span style="color:#adb5bd">v4 (audio fix)</span>
+  </div>
+</div>
+
+<script>
+const PRATELEIRAS_VALIDAS = [
+  '(L2) Prat 1','(L2) Prat 2','(L2) Prat 3','(L2) Prat 4','(L2) Prat 5',
+  '(L2) Prat 6','(L2) Prat 7','(L2) Prat 8','(L2) Prat 9','(L2) Prat 10',
+  '(L2) Prat 11','(L2) Prat 12','(L2) Prat 13','(L2) Prat 14','(L2) Prat 15',
+  '(L2) Prat 16','(L2) Prat 17','(L2) Prat 18','(L2) Prat 19','(L2) Prat 20',
+  '(L2) Prat 21','(L2) Prat 22','(L2) Prat 23','(L2) Prat 24','(L2) Prat 25',
+  '(L2) Prat 26','(L2) Prat 27','(L2) Prat 28','(L2) Prat 29','(L2) Prat 30',
+  '(L2) Prat 31','(L2) Prat 32','(L2) Prat 33','(L2) Prat 34','(L2) Prat 35',
+  '(L2) Prat 36','(L2) Prat 37','(L2) Prat 38','(L2) Prat 39','(L2) Prat 40',
+  '(L2) Prat 41','(L2) Prat 42',
+  '(L1) Prat 60','(L1) Prat 61','(L1) Prat 62','(L1) Prat 63','(L1) Prat 64',
+  '(L2)  Gond 1','(L2) Gond 3','(L2) Gond 2','(L2) Gond 4','(L2) Gond 5',
+  '(L2) Gond 6','(L2) Gond 7',
+  '(L2) Chão','(L1) Chão',
+  '(L2) Parede','(L2) Pré Triagem'
+];
+
+const STORAGE_URL = 'bipador-url-v1';
+const URL_PADRAO = 'https://script.google.com/macros/s/AKfycbxdkNwsKkDTm6pPk-8mI2oirJ0Qtf-oDyeW-8d0rxnYDVWb8FG1F239wT0cfkejSAIO/exec';
+let URL_SCRIPT = localStorage.getItem(STORAGE_URL) || URL_PADRAO;
+if (!localStorage.getItem(STORAGE_URL)) localStorage.setItem(STORAGE_URL, URL_PADRAO);
+
+let contador = 0;
+let historico = [];
+
+const inP = document.getElementById('pacote');
+const inS = document.getElementById('prateleira');
+const fb = document.getElementById('fb');
+const s1 = document.getElementById('s1');
+const s2 = document.getElementById('s2');
+
+function configurar() {
+  const u = prompt('Cole a URL do Web App (termina em /exec):', URL_SCRIPT);
+  if (u) { URL_SCRIPT = u.trim(); localStorage.setItem(STORAGE_URL, URL_SCRIPT); alert('URL salva!'); }
+}
+
+function setFeedback(tipo, msg) { fb.className = 'feedback ' + tipo; fb.textContent = msg; }
+
+function reset() {
+  inP.value = ''; inS.value = '';
+  inP.classList.remove('ok'); inS.classList.remove('ok'); inS.classList.remove('invalid');
+  inS.disabled = true;
+  s1.classList.remove('done'); s2.style.opacity = '0.4';
+  setFeedback('idle', 'Aguardando bip do pacote…');
+  inP.focus();
+}
+
+inP.addEventListener('input', () => {
+  const v = inP.value.trim();
+  if (v.length >= 3) {
+    inP.classList.add('ok'); s1.classList.add('done'); s2.style.opacity = '1';
+    inS.disabled = false;
+    setFeedback('idle', 'Agora bipe o QR da prateleira…');
+    inS.focus();
+  }
+});
+
+inP.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') { e.preventDefault(); if (inP.value.trim().length >= 3) inS.focus(); }
+});
+
+function validarPrateleira(valor) {
+  return PRATELEIRAS_VALIDAS.indexOf(valor.trim()) !== -1;
+}
+
+inS.addEventListener('input', () => {
+  const v = inS.value.trim();
+  if (v.length === 0) {
+    inS.classList.remove('ok'); inS.classList.remove('invalid');
+    return;
+  }
+  if (validarPrateleira(v)) {
+    inS.classList.add('ok'); inS.classList.remove('invalid');
+  } else {
+    const ehPrefixo = PRATELEIRAS_VALIDAS.some(p => p.startsWith(v));
+    if (!ehPrefixo) {
+      inS.classList.add('invalid'); inS.classList.remove('ok');
+    } else {
+      inS.classList.remove('ok'); inS.classList.remove('invalid');
+    }
+  }
+});
+
+inS.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') {
+    e.preventDefault();
+    const v = inS.value.trim();
+    if (validarPrateleira(v)) {
+      salvar();
+    } else {
+      setFeedback('error', '❌ Prateleira inválida: "' + v + '"');
+      beep('err');
+      inS.classList.add('invalid');
+      inS.select();
+    }
+  }
+});
+
+async function salvar() {
+  const pacote = inP.value.trim();
+  const prateleira = inS.value.trim();
+
+  if (!pacote || !validarPrateleira(prateleira)) {
+    setFeedback('error', '❌ Dados inválidos'); return;
+  }
+  if (!URL_SCRIPT) { setFeedback('error', '⚙️ Configure a URL do script primeiro!'); return; }
+
+  setFeedback('idle', 'Salvando…');
+  inP.disabled = true; inS.disabled = true;
+
+  try {
+    const resp = await fetch(URL_SCRIPT, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify({ pacote, prateleira })
+    });
+    const data = await resp.json();
+
+    if (data.ok) {
+      contador++;
+      document.getElementById('ct').textContent = contador;
+      document.getElementById('ult').textContent = prateleira;
+      historico.unshift({ pacote, prateleira, hora: new Date(), atualizado: data.atualizado });
+      renderLog();
+      if (data.atualizado) setFeedback('warn', '⚠️ Pacote já existia → MOVIDO para ' + prateleira);
+      else setFeedback('success', '✅ Salvo em ' + prateleira);
+      beep(data.atualizado ? 'warn' : 'ok');
+    } else {
+      setFeedback('error', '❌ Erro: ' + (data.erro || 'desconhecido'));
+      beep('err');
+    }
+  } catch (err) {
+    setFeedback('error', '❌ Falha de conexão: ' + err.message);
+    beep('err');
+  } finally {
+    inP.disabled = false; inS.disabled = false;
+    setTimeout(() => { reset(); }, 1000);
+  }
+}
+
+function renderLog() {
+  const log = document.getElementById('log');
+  if (historico.length === 0) { log.innerHTML = '<div style="color:#adb5bd;text-align:center;padding:20px">Nada ainda…</div>'; return; }
+  log.innerHTML = historico.slice(0, 30).map(h => {
+    const hora = h.hora.toTimeString().slice(0,5);
+    const flag = h.atualizado ? ' 🔄' : '';
+    return '<div class="log-item"><div><div class="code">' + escapeHtml(h.pacote) + flag + '</div><div style="font-size:11px;color:#868e96">' + hora + '</div></div><div class="pr">' + escapeHtml(h.prateleira) + '</div></div>';
+  }).join('');
+}
+
+function escapeHtml(s) { return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+// AudioContext reutilizado. Criado lazy e mantido vivo pra evitar bloqueio
+// de autoplay quando o beep eh disparado depois de um await (fetch).
+let _audioCtx = null;
+function getAudioCtx() {
+  if (!_audioCtx) {
+    _audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  }
+  if (_audioCtx.state === 'suspended') {
+    _audioCtx.resume().catch(() => {});
+  }
+  return _audioCtx;
+}
+// Garante resume em qualquer interacao do usuario (clique/teclado)
+['click','keydown','touchstart'].forEach(ev => {
+  document.addEventListener(ev, () => {
+    if (_audioCtx && _audioCtx.state === 'suspended') _audioCtx.resume().catch(()=>{});
+  }, { passive: true });
+});
+
+function beep(tipo) {
+  try {
+    const ctx = getAudioCtx();
+    function tom(freq, inicio, duracao, volume, onda) {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = onda || 'sine';
+      osc.frequency.value = freq;
+      osc.connect(gain); gain.connect(ctx.destination);
+      const t0 = ctx.currentTime + inicio;
+      gain.gain.setValueAtTime(0, t0);
+      gain.gain.linearRampToValueAtTime(volume, t0 + 0.01);
+      gain.gain.linearRampToValueAtTime(0, t0 + duracao);
+      osc.start(t0);
+      osc.stop(t0 + duracao + 0.02);
+    }
+    if (tipo === 'ok') {
+      // ding-ding agudo (sucesso): 2 tons subindo, tipo caixa de supermercado
+      tom(1320, 0.00, 0.10, 0.55, 'triangle');
+      tom(1760, 0.12, 0.22, 0.55, 'triangle');
+    } else if (tipo === 'warn') {
+      // aviso (pacote movido): tom medio mais longo
+      tom(660, 0.00, 0.32, 0.45, 'triangle');
+    } else {
+      // erro: 3 bipes graves rapidos, tipo buzzer de errar
+      tom(200, 0.00, 0.12, 0.40, 'square');
+      tom(200, 0.18, 0.12, 0.40, 'square');
+      tom(200, 0.36, 0.20, 0.40, 'square');
+    }
+  } catch(e){}
+}
+
+document.addEventListener('click', (e) => {
+  if (e.target.tagName !== 'INPUT' && e.target.tagName !== 'A') {
+    if (!inS.disabled && !inS.value) inS.focus();
+    else if (!inP.value) inP.focus();
+  }
+});
+</script>
+</body>
+</html>
