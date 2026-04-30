@@ -58,12 +58,13 @@
   </div>
 
   <div class="stats">
-    <div class="stat"><div class="n" id="ct">0</div><div class="l">Bipados nesta sessão</div></div>
-    <div class="stat"><div class="n" id="ult">—</div><div class="l">Última prateleira</div></div>
+    <div class="stat" style="background:#d3f9d8"><div class="n" id="cnt-salvos" style="color:#2b8a3e">0</div><div class="l">✅ Salvos</div></div>
+    <div class="stat" style="background:#e7f5ff"><div class="n" id="cnt-enviando" style="color:#1864ab">0</div><div class="l">⏳ Enviando</div></div>
+    <div class="stat" style="background:#ffe3e3"><div class="n" id="cnt-falhas" style="color:#c92a2a">0</div><div class="l">❌ Falhas</div></div>
   </div>
 
-  <div style="margin-top:16px"><div class="step" style="background:#f1f3f5;color:#495057">📋 Histórico desta sessão</div></div>
-  <div class="log" id="log"><div style="color:#adb5bd;text-align:center;padding:20px">Nada ainda…</div></div>
+  <div style="margin-top:16px"><div class="step" style="background:#f1f3f5;color:#495057">📋 Bipagens (10 últimas + erros)</div></div>
+  <div class="log" id="lista-bips"><div style="color:#adb5bd;text-align:center;padding:20px">Nada ainda…</div></div>
 
   <div style="margin-top:16px;display:flex;gap:8px;justify-content:center">
     <button onclick="beep('ok')" style="padding:8px 12px;border:1px solid #2b8a3e;background:#d3f9d8;color:#2b8a3e;border-radius:6px;cursor:pointer;font-weight:600">🔊 Testar sucesso</button>
@@ -73,7 +74,7 @@
 
   <div class="config">
     <a onclick="configurar()">⚙️ Configurar URL do script</a>
-    &nbsp;·&nbsp; <span style="color:#adb5bd">v6 (scanner fix)</span>
+    &nbsp;·&nbsp; <span style="color:#adb5bd">v7 (fire and forget)</span>
   </div>
 </div>
 
@@ -141,8 +142,11 @@ const URL_PADRAO = 'https://script.google.com/macros/s/AKfycbxdkNwsKkDTm6pPk-8mI
 let URL_SCRIPT = localStorage.getItem(STORAGE_URL) || URL_PADRAO;
 if (!localStorage.getItem(STORAGE_URL)) localStorage.setItem(STORAGE_URL, URL_PADRAO);
 
-let contador = 0;
-let historico = [];
+// ===== Estado dos bips =====
+// Cada bip: { id, pacote, prateleira, hora, status, msg }
+// status: 'enviando' | 'salvo' | 'movido' | 'falhou'
+let bips = [];
+let _nextBipId = 1;
 
 const inP = document.getElementById('pacote');
 const inS = document.getElementById('prateleira');
@@ -233,55 +237,115 @@ inS.addEventListener('keydown', (e) => {
   }
 });
 
-async function salvar() {
+// ===== FIRE-AND-FORGET =====
+// salvar() apenas registra o bip e libera os campos imediatamente.
+// O envio real acontece em background via enviarBip().
+function salvar() {
   const pacote = inP.value.trim();
   const prateleira = inS.value.trim();
 
   if (!pacote || !validarPrateleira(prateleira)) {
-    setFeedback('error', '❌ Dados inválidos'); return;
+    setFeedback('error', '❌ Dados inválidos');
+    return;
   }
-  if (!URL_SCRIPT) { setFeedback('error', '⚙️ Configure a URL do script primeiro!'); return; }
+  if (!URL_SCRIPT) {
+    setFeedback('error', '⚙️ Configure a URL do script primeiro!');
+    return;
+  }
 
-  setFeedback('idle', 'Salvando…');
-  inP.disabled = true; inS.disabled = true;
+  const b = {
+    id: _nextBipId++,
+    pacote: pacote,
+    prateleira: prateleira,
+    hora: new Date(),
+    status: 'enviando',
+    msg: ''
+  };
+  bips.unshift(b);
+  renderBips();
+  setFeedback('success', '⏳ Enviando ' + pacote + ' → ' + prateleira);
 
+  // Limpa imediatamente pra liberar próximo bip.
+  setTimeout(() => reset(), 50);
+
+  // Dispara em background.
+  enviarBip(b);
+}
+
+async function enviarBip(b) {
+  b.status = 'enviando';
+  b.msg = '';
+  renderBips();
   try {
     const resp = await fetch(URL_SCRIPT, {
       method: 'POST',
       headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-      body: JSON.stringify({ pacote, prateleira })
+      body: JSON.stringify({ pacote: b.pacote, prateleira: b.prateleira })
     });
     const data = await resp.json();
-
     if (data.ok) {
-      contador++;
-      document.getElementById('ct').textContent = contador;
-      document.getElementById('ult').textContent = prateleira;
-      historico.unshift({ pacote, prateleira, hora: new Date(), atualizado: data.atualizado });
-      renderLog();
-      if (data.atualizado) setFeedback('warn', '⚠️ Pacote já existia → MOVIDO para ' + prateleira);
-      else setFeedback('success', '✅ Salvo em ' + prateleira);
+      b.status = data.atualizado ? 'movido' : 'salvo';
       beep(data.atualizado ? 'warn' : 'ok');
     } else {
-      setFeedback('error', '❌ Erro: ' + (data.erro || 'desconhecido'));
+      b.status = 'falhou';
+      b.msg = data.erro || 'desconhecido';
       beep('err');
     }
   } catch (err) {
-    setFeedback('error', '❌ Falha de conexão: ' + err.message);
+    b.status = 'falhou';
+    b.msg = err.message || 'falha de conexão';
     beep('err');
-  } finally {
-    inP.disabled = false; inS.disabled = false;
-    setTimeout(() => { reset(); }, 1000);
   }
+  renderBips();
 }
 
-function renderLog() {
-  const log = document.getElementById('log');
-  if (historico.length === 0) { log.innerHTML = '<div style="color:#adb5bd;text-align:center;padding:20px">Nada ainda…</div>'; return; }
-  log.innerHTML = historico.slice(0, 30).map(h => {
-    const hora = h.hora.toTimeString().slice(0,5);
-    const flag = h.atualizado ? ' 🔄' : '';
-    return '<div class="log-item"><div><div class="code">' + escapeHtml(h.pacote) + flag + '</div><div style="font-size:11px;color:#868e96">' + hora + '</div></div><div class="pr">' + escapeHtml(h.prateleira) + '</div></div>';
+function reenviarBip(id) {
+  const b = bips.find(x => x.id === id);
+  if (!b) return;
+  enviarBip(b);
+}
+window.reenviarBip = reenviarBip;
+
+function renderBips() {
+  // Contadores
+  const c = { enviando: 0, salvo: 0, movido: 0, falhou: 0 };
+  bips.forEach(b => { c[b.status] = (c[b.status] || 0) + 1; });
+  document.getElementById('cnt-salvos').textContent = c.salvo + c.movido;
+  document.getElementById('cnt-enviando').textContent = c.enviando;
+  document.getElementById('cnt-falhas').textContent = c.falhou;
+
+  // Lista: TODOS os falhou (até serem reenviados com sucesso) + 10 últimos não-falhou
+  const falhou = bips.filter(b => b.status === 'falhou');
+  const outros = bips.filter(b => b.status !== 'falhou').slice(0, 10);
+  const visiveis = falhou.concat(outros).sort((a, b) => b.id - a.id);
+
+  const log = document.getElementById('lista-bips');
+  if (visiveis.length === 0) {
+    log.innerHTML = '<div style="color:#adb5bd;text-align:center;padding:20px">Nada ainda…</div>';
+    return;
+  }
+  const icones = { enviando: '⏳', salvo: '✅', movido: '🔄', falhou: '❌' };
+  const corBg = { enviando: '#e7f5ff', salvo: '#f0fff4', movido: '#fff9db', falhou: '#fff5f5' };
+  const corBorda = { enviando: '#74c0fc', salvo: '#69db7c', movido: '#ffd43b', falhou: '#ff8787' };
+  log.innerHTML = visiveis.map(b => {
+    const hora = b.hora.toTimeString().slice(0, 5);
+    const reenviar = b.status === 'falhou'
+      ? '<button onclick="reenviarBip(' + b.id + ')" style="padding:4px 10px;border:1px solid #c92a2a;background:#fff;color:#c92a2a;border-radius:4px;cursor:pointer;font-weight:600;font-size:12px">↻ Reenviar</button>'
+      : '';
+    const errMsg = b.status === 'falhou' && b.msg
+      ? '<div style="font-size:11px;color:#c92a2a;margin-top:2px">' + escapeHtml(b.msg) + '</div>'
+      : '';
+    return '<div class="log-item" style="background:' + corBg[b.status] + ';border-left:3px solid ' + corBorda[b.status] + ';padding-left:10px;border-bottom:1px solid #f1f3f5">'
+      + '<div style="flex:1;min-width:0">'
+      +   '<div class="code">' + icones[b.status] + ' ' + escapeHtml(b.pacote) + '</div>'
+      +   '<div style="font-size:11px;color:#868e96">' + hora + '</div>'
+      +   errMsg
+      + '</div>'
+      + '<div style="display:flex;align-items:center;gap:6px">'
+      +   '<div class="pr">' + escapeHtml(b.prateleira) + '</div>'
+      +   reenviar
+      + '</div>'
+      + '</div>';
   }).join('');
 }
 
@@ -339,11 +403,24 @@ function beep(tipo) {
 }
 
 document.addEventListener('click', (e) => {
-  if (e.target.tagName !== 'INPUT' && e.target.tagName !== 'A') {
+  if (e.target.tagName !== 'INPUT' && e.target.tagName !== 'A' && e.target.tagName !== 'BUTTON') {
     if (!inS.disabled && !inS.value) inS.focus();
     else if (!inP.value) inP.focus();
   }
 });
+
+// ===== AQUECIMENTO DO APPS SCRIPT =====
+// Google "esfria" o script após alguns minutos de inatividade. Quando isso
+// acontece, o próximo POST demora ~3-5s a mais só pra acordar. Pra evitar:
+// fazemos um GET silencioso ao carregar a página + a cada 4 minutos enquanto
+// a aba estiver aberta.
+function _aquecerScript() {
+  if (!URL_SCRIPT) return;
+  fetch(URL_SCRIPT, { method: 'GET', cache: 'no-store' })
+    .then(r => r.text()).catch(() => {});
+}
+_aquecerScript();
+setInterval(_aquecerScript, 4 * 60 * 1000);
 </script>
 </body>
 </html>
