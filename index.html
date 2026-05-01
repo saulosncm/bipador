@@ -54,6 +54,7 @@ input:disabled { background: #f1f3f5; }
 <div class="step" id="s2" style="opacity:0.4">2. Prateleira (bipe o QR)</div>
 <input type="text" id="prateleira" placeholder="Bipe o QR da prateleira" autocomplete="off" disabled>
 <div class="feedback idle" id="fb">Aguardando bip do pacote…</div>
+<button id="btn-cancelar-erro" onclick="cancelarBipAtual()" style="display:none;margin-top:10px;width:100%;padding:12px;background:#fff;border:2px solid #c92a2a;color:#c92a2a;border-radius:8px;cursor:pointer;font-weight:700;font-size:14px">✕ Cancelar bip atual e recomeçar</button>
 </div>
 <div class="stats">
 <div class="stat" style="background:#d3f9d8"><div class="n" id="cnt-salvos" style="color:#2b8a3e">0</div><div class="l">✅ Salvos</div></div>
@@ -69,7 +70,7 @@ input:disabled { background: #f1f3f5; }
 </div>
 <div class="config">
 <a onclick="configurar()">⚙️ Configurar URL do script</a> &nbsp;·&nbsp;
-<span style="color:#adb5bd">v8 (sem acento)</span>
+<span style="color:#adb5bd">v9 (lock prateleira)</span>
 </div>
 </div>
 <script>
@@ -128,16 +129,42 @@ const PRATELEIRAS_VALIDAS = [
 '(L2) Parede','(L2) Pre Triagem'
 ];
 
-// Remove acentos / diacriticos. Usado pra deixar a comparacao tolerante:
-// se o QR antigo ainda tiver "Chão" ou "Pré Triagem" com acento, ainda valida.
+// Remove acentos / diacriticos via tabela explicita (mais robusto que regex
+// Unicode: nao depende de charset do arquivo nem de NFD do navegador).
+const _ACENTOS = {
+  'á':'a','à':'a','â':'a','ã':'a','ä':'a','å':'a',
+  'Á':'A','À':'A','Â':'A','Ã':'A','Ä':'A','Å':'A',
+  'é':'e','è':'e','ê':'e','ë':'e',
+  'É':'E','È':'E','Ê':'E','Ë':'E',
+  'í':'i','ì':'i','î':'i','ï':'i',
+  'Í':'I','Ì':'I','Î':'I','Ï':'I',
+  'ó':'o','ò':'o','ô':'o','õ':'o','ö':'o',
+  'Ó':'O','Ò':'O','Ô':'O','Õ':'O','Ö':'O',
+  'ú':'u','ù':'u','û':'u','ü':'u',
+  'Ú':'U','Ù':'U','Û':'U','Ü':'U',
+  'ç':'c','Ç':'C','ñ':'n','Ñ':'N'
+};
 function _semAcento(s) {
-  return String(s).normalize('NFD').replace(/[̀-ͯ]/g, '');
+  let out = '';
+  const str = String(s);
+  for (let i = 0; i < str.length; i++) {
+    const c = str[i];
+    out += _ACENTOS[c] || c;
+  }
+  // Tambem cobre forma decomposta (NFD): tira combining marks U+0300..U+036F
+  return out.replace(/[̀-ͯ]/g, '');
 }
 
-// Mapa: chave normalizada (sem acento, trim) -> nome canonico (sem acento) da lista.
+// Chave de comparacao: sem acento, trim, lowercase, espacos colapsados.
+// Tolerante a variacoes de QR (ex: "(L2)  Chao", "(l2) chão", etc.)
+function _chave(s) {
+  return _semAcento(s).trim().toLowerCase().replace(/\s+/g, ' ');
+}
+
+// Mapa: chave normalizada -> nome canonico (sem acento) da lista.
 const _MAPA_PRATELEIRAS = (function() {
   const m = {};
-  PRATELEIRAS_VALIDAS.forEach(p => { m[_semAcento(p).trim()] = p; });
+  PRATELEIRAS_VALIDAS.forEach(p => { m[_chave(p)] = p; });
   return m;
 })();
 
@@ -168,12 +195,17 @@ function setFeedback(tipo, msg) { fb.className = 'feedback ' + tipo; fb.textCont
 function reset() {
   inP.value = '';
   inS.value = '';
+  inP.disabled = false;
   inP.classList.remove('ok');
   inS.classList.remove('ok');
   inS.classList.remove('invalid');
   inS.disabled = true;
   s1.classList.remove('done');
   s2.style.opacity = '0.4';
+  // Garante que botoes/state de erro sejam limpos em qualquer reset.
+  if (typeof _emErro !== 'undefined') _emErro = false;
+  const btnC = document.getElementById('btn-cancelar-erro');
+  if (btnC) btnC.style.display = 'none';
   setFeedback('idle', 'Aguardando bip do pacote…');
   inP.focus();
 }
@@ -213,23 +245,59 @@ inP.addEventListener('keydown', (e) => {
 
 // Retorna o nome canonico (sem acento, da lista) se valido. null se nao for.
 function canonicalPrateleira(valor) {
-  const k = _semAcento(valor).trim();
-  return _MAPA_PRATELEIRAS[k] || null;
+  return _MAPA_PRATELEIRAS[_chave(valor)] || null;
 }
 
 function validarPrateleira(valor) {
   return canonicalPrateleira(valor) !== null;
 }
 
+// Estado de erro: enquanto true, o campo PACOTE fica travado ate o usuario
+// bipar uma prateleira valida (ou clicar Cancelar pra abortar o bip).
+let _emErro = false;
+
+function _setErroPrateleira(valor) {
+  _emErro = true;
+  inP.disabled = true;
+  inP.classList.remove('ok');
+  inS.classList.add('invalid');
+  inS.classList.remove('ok');
+  setFeedback('error', '❌ Prateleira inválida: "' + valor + '" — bipe a correta ou cancele');
+  document.getElementById('btn-cancelar-erro').style.display = 'block';
+  beep('err');
+  inS.select();
+  inS.focus();
+}
+
+function _limparErroPrateleira() {
+  _emErro = false;
+  inP.disabled = false;
+  inS.classList.remove('invalid');
+  document.getElementById('btn-cancelar-erro').style.display = 'none';
+}
+
+function cancelarBipAtual() {
+  // Aborta o bip (limpa pacote + prateleira) e volta pro inicio.
+  _limparErroPrateleira();
+  reset();
+}
+window.cancelarBipAtual = cancelarBipAtual;
+
 inS.addEventListener('input', () => {
   const v = inS.value.trim();
-  if (v.length === 0) { inS.classList.remove('ok'); inS.classList.remove('invalid'); return; }
+  if (v.length === 0) {
+    inS.classList.remove('ok'); inS.classList.remove('invalid');
+    return;
+  }
   if (validarPrateleira(v)) {
     inS.classList.add('ok');
     inS.classList.remove('invalid');
+    if (_emErro) {
+      setFeedback('success', '✅ Prateleira válida — pressione Enter pra salvar');
+    }
   } else {
-    const vNorm = _semAcento(v);
-    const ehPrefixo = PRATELEIRAS_VALIDAS.some(p => p.startsWith(vNorm));
+    const vNorm = _semAcento(v).toLowerCase();
+    const ehPrefixo = PRATELEIRAS_VALIDAS.some(p => p.toLowerCase().startsWith(vNorm));
     if (!ehPrefixo) { inS.classList.add('invalid'); inS.classList.remove('ok'); }
     else { inS.classList.remove('ok'); inS.classList.remove('invalid'); }
   }
@@ -240,12 +308,10 @@ inS.addEventListener('keydown', (e) => {
     e.preventDefault();
     const v = inS.value.trim();
     if (validarPrateleira(v)) {
+      _limparErroPrateleira();
       salvar();
     } else {
-      setFeedback('error', '❌ Prateleira inválida: "' + v + '"');
-      beep('err');
-      inS.classList.add('invalid');
-      inS.select();
+      _setErroPrateleira(v);
     }
   }
 });
