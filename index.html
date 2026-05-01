@@ -55,6 +55,7 @@ input:disabled { background: #f1f3f5; }
 <input type="text" id="prateleira" placeholder="Bipe o QR da prateleira" autocomplete="off" disabled>
 <div class="feedback idle" id="fb">Aguardando bip do pacote…</div>
 <button id="btn-cancelar-erro" onclick="cancelarBipAtual()" style="display:none;margin-top:10px;width:100%;padding:12px;background:#fff;border:2px solid #c92a2a;color:#c92a2a;border-radius:8px;cursor:pointer;font-weight:700;font-size:14px">✕ Cancelar bip atual e recomeçar</button>
+<div id="debug-panel" style="display:none;margin-top:10px;padding:12px;background:#fff5f5;border:1px solid #ffc9c9;border-radius:8px;font-size:13px;color:#495057"></div>
 </div>
 <div class="stats">
 <div class="stat" style="background:#d3f9d8"><div class="n" id="cnt-salvos" style="color:#2b8a3e">0</div><div class="l">✅ Salvos</div></div>
@@ -70,7 +71,7 @@ input:disabled { background: #f1f3f5; }
 </div>
 <div class="config">
 <a onclick="configurar()">⚙️ Configurar URL do script</a> &nbsp;·&nbsp;
-<span style="color:#adb5bd">v9 (lock prateleira)</span>
+<span style="color:#adb5bd">v10 (validacao simples + debug)</span>
 </div>
 </div>
 <script>
@@ -129,39 +130,13 @@ const PRATELEIRAS_VALIDAS = [
 '(L2) Parede','(L2) Pre Triagem'
 ];
 
-// Remove acentos / diacriticos via tabela explicita (mais robusto que regex
-// Unicode: nao depende de charset do arquivo nem de NFD do navegador).
-const _ACENTOS = {
-  'á':'a','à':'a','â':'a','ã':'a','ä':'a','å':'a',
-  'Á':'A','À':'A','Â':'A','Ã':'A','Ä':'A','Å':'A',
-  'é':'e','è':'e','ê':'e','ë':'e',
-  'É':'E','È':'E','Ê':'E','Ë':'E',
-  'í':'i','ì':'i','î':'i','ï':'i',
-  'Í':'I','Ì':'I','Î':'I','Ï':'I',
-  'ó':'o','ò':'o','ô':'o','õ':'o','ö':'o',
-  'Ó':'O','Ò':'O','Ô':'O','Õ':'O','Ö':'O',
-  'ú':'u','ù':'u','û':'u','ü':'u',
-  'Ú':'U','Ù':'U','Û':'U','Ü':'U',
-  'ç':'c','Ç':'C','ñ':'n','Ñ':'N'
-};
-function _semAcento(s) {
-  let out = '';
-  const str = String(s);
-  for (let i = 0; i < str.length; i++) {
-    const c = str[i];
-    out += _ACENTOS[c] || c;
-  }
-  // Tambem cobre forma decomposta (NFD): tira combining marks U+0300..U+036F
-  return out.replace(/[̀-ͯ]/g, '');
-}
-
-// Chave de comparacao: sem acento, trim, lowercase, espacos colapsados.
-// Tolerante a variacoes de QR (ex: "(L2)  Chao", "(l2) chão", etc.)
+// Validacao SIMPLES: case-insensitive + colapso de espacos. Nada de acento.
+// Se a entrada bipar nao bate exatamente com algum nome da lista, eh invalida.
 function _chave(s) {
-  return _semAcento(s).trim().toLowerCase().replace(/\s+/g, ' ');
+  return String(s).trim().toLowerCase().replace(/\s+/g, ' ');
 }
 
-// Mapa: chave normalizada -> nome canonico (sem acento) da lista.
+// Mapa: chave normalizada -> nome canonico da lista.
 const _MAPA_PRATELEIRAS = (function() {
   const m = {};
   PRATELEIRAS_VALIDAS.forEach(p => { m[_chave(p)] = p; });
@@ -206,6 +181,8 @@ function reset() {
   if (typeof _emErro !== 'undefined') _emErro = false;
   const btnC = document.getElementById('btn-cancelar-erro');
   if (btnC) btnC.style.display = 'none';
+  const dbg = document.getElementById('debug-panel');
+  if (dbg) dbg.style.display = 'none';
   setFeedback('idle', 'Aguardando bip do pacote…');
   inP.focus();
 }
@@ -256,13 +233,35 @@ function validarPrateleira(valor) {
 // bipar uma prateleira valida (ou clicar Cancelar pra abortar o bip).
 let _emErro = false;
 
+function _debugChars(s) {
+  // Mostra cada caractere + codepoint (util pra ver caracteres invisiveis ou
+  // diferentes do que parece — ex: NBSP ao inves de espaco).
+  return String(s).split('').map(c => {
+    const code = c.charCodeAt(0).toString(16).toUpperCase().padStart(4,'0');
+    const vis = c === ' ' ? '·' : (c.charCodeAt(0) < 32 ? '?' : c);
+    return vis + '\u00A0[U+' + code + ']';
+  }).join(' ');
+}
+
 function _setErroPrateleira(valor) {
   _emErro = true;
   inP.disabled = true;
   inP.classList.remove('ok');
   inS.classList.add('invalid');
   inS.classList.remove('ok');
-  setFeedback('error', '❌ Prateleira inválida: "' + valor + '" — bipe a correta ou cancele');
+  setFeedback('error', '❌ Prateleira inválida: "' + valor + '"');
+
+  // Painel de diagnostico: mostra exatamente o que veio
+  const dbg = document.getElementById('debug-panel');
+  const sugestoes = PRATELEIRAS_VALIDAS
+    .filter(p => p.toLowerCase().includes(valor.trim().toLowerCase().slice(0, 4)))
+    .slice(0, 5);
+  dbg.innerHTML =
+    '<div style="font-weight:700;margin-bottom:6px;color:#c92a2a">🔍 Diagnostico:</div>' +
+    '<div style="margin-bottom:6px"><b>Bipado:</b> <code style="background:#fff;padding:2px 6px;border-radius:3px;font-size:12px">' + _debugChars(valor) + '</code></div>' +
+    (sugestoes.length ? '<div><b>Talvez:</b> ' + sugestoes.map(s => '<code style="background:#fff;padding:2px 6px;border-radius:3px;margin:2px;display:inline-block">' + escapeHtml(s) + '</code>').join('') + '</div>' : '<div style="color:#868e96">Nenhuma prateleira parecida.</div>');
+  dbg.style.display = 'block';
+
   document.getElementById('btn-cancelar-erro').style.display = 'block';
   beep('err');
   inS.select();
@@ -274,6 +273,8 @@ function _limparErroPrateleira() {
   inP.disabled = false;
   inS.classList.remove('invalid');
   document.getElementById('btn-cancelar-erro').style.display = 'none';
+  const dbg = document.getElementById('debug-panel');
+  if (dbg) dbg.style.display = 'none';
 }
 
 function cancelarBipAtual() {
@@ -296,8 +297,8 @@ inS.addEventListener('input', () => {
       setFeedback('success', '✅ Prateleira válida — pressione Enter pra salvar');
     }
   } else {
-    const vNorm = _semAcento(v).toLowerCase();
-    const ehPrefixo = PRATELEIRAS_VALIDAS.some(p => p.toLowerCase().startsWith(vNorm));
+    const vLow = v.toLowerCase();
+    const ehPrefixo = PRATELEIRAS_VALIDAS.some(p => p.toLowerCase().startsWith(vLow));
     if (!ehPrefixo) { inS.classList.add('invalid'); inS.classList.remove('ok'); }
     else { inS.classList.remove('ok'); inS.classList.remove('invalid'); }
   }
