@@ -4,35 +4,35 @@
 <meta charset="UTF-8">
 <title>Bipar Pacote → Prateleira</title>
 <style>
-  * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { font-family: -apple-system, Segoe UI, Roboto, sans-serif; background: #f1f3f5; min-height: 100vh; padding: 20px; }
-  .wrap { max-width: 600px; margin: 0 auto; }
-  h1 { color: #2d3277; margin-bottom: 4px; font-size: 22px; }
-  .sub { color: #868e96; font-size: 13px; margin-bottom: 20px; }
-  .card { background: #fff; padding: 24px; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); margin-bottom: 16px; }
-  .step { font-size: 13px; color: #1864ab; background: #e7f5ff; padding: 8px 12px; border-radius: 6px; font-weight: 600; margin-bottom: 8px; display: inline-block; }
-  .step.done { background: #d3f9d8; color: #2b8a3e; }
-  input { width: 100%; padding: 16px; font-size: 20px; border: 3px solid #dee2e6; border-radius: 8px; font-family: monospace; }
-  input:focus { outline: none; border-color: #3483fa; }
-  input.ok { border-color: #00a650; background: #f0fff4; }
-  input.invalid { border-color: #c92a2a; background: #fff5f5; }
-  input:disabled { background: #f1f3f5; }
-  .feedback { padding: 16px; border-radius: 8px; font-weight: 700; text-align: center; font-size: 16px; margin-top: 12px; min-height: 60px; display: flex; align-items: center; justify-content: center; }
-  .feedback.success { background: #d3f9d8; color: #2b8a3e; }
-  .feedback.error { background: #ffe3e3; color: #c92a2a; }
-  .feedback.warn { background: #fff9db; color: #846503; }
-  .feedback.idle { background: #f8f9fa; color: #adb5bd; }
-  .stats { display: flex; gap: 12px; margin-top: 16px; }
-  .stat { flex: 1; background: #fff; padding: 12px; border-radius: 8px; text-align: center; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
-  .stat .n { font-size: 20px; font-weight: 700; color: #2d3277; word-break: break-word; }
-  .stat .l { font-size: 11px; color: #868e96; }
-  .config { font-size: 12px; color: #adb5bd; margin-top: 20px; text-align: center; }
-  .config a { color: #3483fa; cursor: pointer; }
-  .log { background: #fff; border-radius: 8px; padding: 12px; max-height: 240px; overflow-y: auto; font-size: 13px; }
-  .log-item { padding: 8px; border-bottom: 1px solid #f1f3f5; display: flex; justify-content: space-between; gap: 8px; align-items: center; }
-  .log-item:last-child { border-bottom: none; }
-  .log-item .code { font-family: monospace; color: #495057; word-break: break-all; }
-  .log-item .pr { background: #2d3277; color: #fff; padding: 4px 8px; border-radius: 4px; font-weight: 700; flex-shrink: 0; font-size: 12px; }
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: -apple-system, Segoe UI, Roboto, sans-serif; background: #f1f3f5; min-height: 100vh; padding: 20px; }
+.wrap { max-width: 600px; margin: 0 auto; }
+h1 { color: #2d3277; margin-bottom: 4px; font-size: 22px; }
+.sub { color: #868e96; font-size: 13px; margin-bottom: 20px; }
+.card { background: #fff; padding: 24px; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); margin-bottom: 16px; }
+.step { font-size: 13px; color: #1864ab; background: #e7f5ff; padding: 8px 12px; border-radius: 6px; font-weight: 600; margin-bottom: 8px; display: inline-block; }
+.step.done { background: #d3f9d8; color: #2b8a3e; }
+input { width: 100%; padding: 16px; font-size: 20px; border: 3px solid #dee2e6; border-radius: 8px; font-family: monospace; }
+input:focus { outline: none; border-color: #3483fa; }
+input.ok { border-color: #00a650; background: #f0fff4; }
+input.invalid { border-color: #c92a2a; background: #fff5f5; }
+input:disabled { background: #f1f3f5; }
+.feedback { padding: 16px; border-radius: 8px; font-weight: 700; text-align: center; font-size: 16px; margin-top: 12px; min-height: 60px; display: flex; align-items: center; justify-content: center; }
+.feedback.success { background: #d3f9d8; color: #2b8a3e; }
+.feedback.error { background: #ffe3e3; color: #c92a2a; }
+.feedback.warn { background: #fff9db; color: #846503; }
+.feedback.idle { background: #f8f9fa; color: #adb5bd; }
+.stats { display: flex; gap: 12px; margin-top: 16px; }
+.stat { flex: 1; background: #fff; padding: 12px; border-radius: 8px; text-align: center; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
+.stat .n { font-size: 20px; font-weight: 700; color: #2d3277; word-break: break-word; }
+.stat .l { font-size: 11px; color: #868e96; }
+.config { font-size: 12px; color: #adb5bd; margin-top: 20px; text-align: center; }
+.config a { color: #3483fa; cursor: pointer; }
+.log { background: #fff; border-radius: 8px; padding: 12px; max-height: 240px; overflow-y: auto; font-size: 13px; }
+.log-item { padding: 8px; border-bottom: 1px solid #f1f3f5; display: flex; justify-content: space-between; gap: 8px; align-items: center; }
+.log-item:last-child { border-bottom: none; }
+.log-item .code { font-family: monospace; color: #495057; word-break: break-all; }
+.log-item .pr { background: #2d3277; color: #fff; padding: 4px 8px; border-radius: 4px; font-weight: 700; flex-shrink: 0; font-size: 12px; }
 </style>
 </head>
 <body>
@@ -45,51 +45,43 @@
   <div id="login-erro" style="color:#ffd2d2;min-height:20px;font-size:14px;font-weight:600"></div>
 </div>
 <div class="wrap">
-  <h1>📦 Bipar Pacote → Prateleira</h1>
-  <div class="sub">Bipa pacote, bipa QR da prateleira, salva sozinho.</div>
-
-  <div class="card">
-    <div class="step" id="s1">1. Pacote</div>
-    <input type="text" id="pacote" placeholder="Bipe o código do pacote" autocomplete="off" autofocus>
-    <div style="height: 14px"></div>
-    <div class="step" id="s2" style="opacity:0.4">2. Prateleira (bipe o QR)</div>
-    <input type="text" id="prateleira" placeholder="Bipe o QR da prateleira" autocomplete="off" disabled>
-    <div class="feedback idle" id="fb">Aguardando bip do pacote…</div>
-  </div>
-
-  <div class="stats">
-    <div class="stat" style="background:#d3f9d8"><div class="n" id="cnt-salvos" style="color:#2b8a3e">0</div><div class="l">✅ Salvos</div></div>
-    <div class="stat" style="background:#e7f5ff"><div class="n" id="cnt-enviando" style="color:#1864ab">0</div><div class="l">⏳ Enviando</div></div>
-    <div class="stat" style="background:#ffe3e3"><div class="n" id="cnt-falhas" style="color:#c92a2a">0</div><div class="l">❌ Falhas</div></div>
-  </div>
-
-  <div style="margin-top:16px"><div class="step" style="background:#f1f3f5;color:#495057">📋 Bipagens (10 últimas + erros)</div></div>
-  <div class="log" id="lista-bips"><div style="color:#adb5bd;text-align:center;padding:20px">Nada ainda…</div></div>
-
-  <div style="margin-top:16px;display:flex;gap:8px;justify-content:center">
-    <button onclick="beep('ok')" style="padding:8px 12px;border:1px solid #2b8a3e;background:#d3f9d8;color:#2b8a3e;border-radius:6px;cursor:pointer;font-weight:600">🔊 Testar sucesso</button>
-    <button onclick="beep('warn')" style="padding:8px 12px;border:1px solid #846503;background:#fff9db;color:#846503;border-radius:6px;cursor:pointer;font-weight:600">🔊 Testar aviso</button>
-    <button onclick="beep('err')" style="padding:8px 12px;border:1px solid #c92a2a;background:#ffe3e3;color:#c92a2a;border-radius:6px;cursor:pointer;font-weight:600">🔊 Testar erro</button>
-  </div>
-
-  <div class="config">
-    <a onclick="configurar()">⚙️ Configurar URL do script</a>
-    &nbsp;·&nbsp; <span style="color:#adb5bd">v7 (fire and forget)</span>
-  </div>
+<h1>📦 Bipar Pacote → Prateleira</h1>
+<div class="sub">Bipa pacote, bipa QR da prateleira, salva sozinho.</div>
+<div class="card">
+<div class="step" id="s1">1. Pacote</div>
+<input type="text" id="pacote" placeholder="Bipe o código do pacote" autocomplete="off" autofocus>
+<div style="height: 14px"></div>
+<div class="step" id="s2" style="opacity:0.4">2. Prateleira (bipe o QR)</div>
+<input type="text" id="prateleira" placeholder="Bipe o QR da prateleira" autocomplete="off" disabled>
+<div class="feedback idle" id="fb">Aguardando bip do pacote…</div>
 </div>
-
+<div class="stats">
+<div class="stat" style="background:#d3f9d8"><div class="n" id="cnt-salvos" style="color:#2b8a3e">0</div><div class="l">✅ Salvos</div></div>
+<div class="stat" style="background:#e7f5ff"><div class="n" id="cnt-enviando" style="color:#1864ab">0</div><div class="l">⏳ Enviando</div></div>
+<div class="stat" style="background:#ffe3e3"><div class="n" id="cnt-falhas" style="color:#c92a2a">0</div><div class="l">❌ Falhas</div></div>
+</div>
+<div style="margin-top:16px"><div class="step" style="background:#f1f3f5;color:#495057">📋 Bipagens (10 últimas + erros)</div></div>
+<div class="log" id="lista-bips"><div style="color:#adb5bd;text-align:center;padding:20px">Nada ainda…</div></div>
+<div style="margin-top:16px;display:flex;gap:8px;justify-content:center">
+<button onclick="beep('ok')" style="padding:8px 12px;border:1px solid #2b8a3e;background:#d3f9d8;color:#2b8a3e;border-radius:6px;cursor:pointer;font-weight:600">🔊 Testar sucesso</button>
+<button onclick="beep('warn')" style="padding:8px 12px;border:1px solid #846503;background:#fff9db;color:#846503;border-radius:6px;cursor:pointer;font-weight:600">🔊 Testar aviso</button>
+<button onclick="beep('err')" style="padding:8px 12px;border:1px solid #c92a2a;background:#ffe3e3;color:#c92a2a;border-radius:6px;cursor:pointer;font-weight:600">🔊 Testar erro</button>
+</div>
+<div class="config">
+<a onclick="configurar()">⚙️ Configurar URL do script</a> &nbsp;·&nbsp;
+<span style="color:#adb5bd">v8 (sem acento)</span>
+</div>
+</div>
 <script>
 // ===== GATE DE SENHA =====
 // Hash SHA-256 da senha (não armazenamos a senha em texto puro).
 // Senha atual: 000000
 const SENHA_HASH = '91b4d142823f7d20c5f08df69122de43f35f057a988d9619f6d3138485c9a203';
 const AUTH_KEY = 'bipador-auth-v1';
-
 async function _sha256(str) {
   const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(str));
   return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2,'0')).join('');
 }
-
 async function _entrar() {
   const inp = document.getElementById('login-input');
   const erro = document.getElementById('login-erro');
@@ -105,13 +97,9 @@ async function _entrar() {
     inp.focus();
   }
 }
-
 (function _initGate() {
   const gate = document.getElementById('login-gate');
-  if (sessionStorage.getItem(AUTH_KEY) === SENHA_HASH) {
-    gate.style.display = 'none';
-    return;
-  }
+  if (sessionStorage.getItem(AUTH_KEY) === SENHA_HASH) { gate.style.display = 'none'; return; }
   const inp = document.getElementById('login-input');
   const btn = document.getElementById('login-btn');
   btn.addEventListener('click', _entrar);
@@ -120,22 +108,38 @@ async function _entrar() {
 })();
 
 // ===== APP =====
+
+// Lista canonica das prateleiras validas, JA SEM ACENTO.
+// Tudo que entra (do leitor / QR) e tudo que sai (pra planilha) usa esta forma.
 const PRATELEIRAS_VALIDAS = [
-  '(L2) Prat 1','(L2) Prat 2','(L2) Prat 3','(L2) Prat 4','(L2) Prat 5',
-  '(L2) Prat 6','(L2) Prat 7','(L2) Prat 8','(L2) Prat 9','(L2) Prat 10',
-  '(L2) Prat 11','(L2) Prat 12','(L2) Prat 13','(L2) Prat 14','(L2) Prat 15',
-  '(L2) Prat 16','(L2) Prat 17','(L2) Prat 18','(L2) Prat 19','(L2) Prat 20',
-  '(L2) Prat 21','(L2) Prat 22','(L2) Prat 23','(L2) Prat 24','(L2) Prat 25',
-  '(L2) Prat 26','(L2) Prat 27','(L2) Prat 28','(L2) Prat 29','(L2) Prat 30',
-  '(L2) Prat 31','(L2) Prat 32','(L2) Prat 33','(L2) Prat 34','(L2) Prat 35',
-  '(L2) Prat 36','(L2) Prat 37','(L2) Prat 38','(L2) Prat 39','(L2) Prat 40',
-  '(L2) Prat 41','(L2) Prat 42',
-  '(L1) Prat 60','(L1) Prat 61','(L1) Prat 62','(L1) Prat 63','(L1) Prat 64',
-  '(L2)  Gond 1','(L2) Gond 3','(L2) Gond 2','(L2) Gond 4','(L2) Gond 5',
-  '(L2) Gond 6','(L2) Gond 7',
-  '(L2) Chão','(L1) Chão',
-  '(L2) Parede','(L2) Pré Triagem'
+'(L2) Prat 1','(L2) Prat 2','(L2) Prat 3','(L2) Prat 4','(L2) Prat 5',
+'(L2) Prat 6','(L2) Prat 7','(L2) Prat 8','(L2) Prat 9','(L2) Prat 10',
+'(L2) Prat 11','(L2) Prat 12','(L2) Prat 13','(L2) Prat 14','(L2) Prat 15',
+'(L2) Prat 16','(L2) Prat 17','(L2) Prat 18','(L2) Prat 19','(L2) Prat 20',
+'(L2) Prat 21','(L2) Prat 22','(L2) Prat 23','(L2) Prat 24','(L2) Prat 25',
+'(L2) Prat 26','(L2) Prat 27','(L2) Prat 28','(L2) Prat 29','(L2) Prat 30',
+'(L2) Prat 31','(L2) Prat 32','(L2) Prat 33','(L2) Prat 34','(L2) Prat 35',
+'(L2) Prat 36','(L2) Prat 37','(L2) Prat 38','(L2) Prat 39','(L2) Prat 40',
+'(L2) Prat 41','(L2) Prat 42',
+'(L1) Prat 60','(L1) Prat 61','(L1) Prat 62','(L1) Prat 63','(L1) Prat 64',
+'(L2) Gond 1','(L2) Gond 3','(L2) Gond 2','(L2) Gond 4','(L2) Gond 5',
+'(L2) Gond 6','(L2) Gond 7',
+'(L2) Chao','(L1) Chao',
+'(L2) Parede','(L2) Pre Triagem'
 ];
+
+// Remove acentos / diacriticos. Usado pra deixar a comparacao tolerante:
+// se o QR antigo ainda tiver "Chão" ou "Pré Triagem" com acento, ainda valida.
+function _semAcento(s) {
+  return String(s).normalize('NFD').replace(/[̀-ͯ]/g, '');
+}
+
+// Mapa: chave normalizada (sem acento, trim) -> nome canonico (sem acento) da lista.
+const _MAPA_PRATELEIRAS = (function() {
+  const m = {};
+  PRATELEIRAS_VALIDAS.forEach(p => { m[_semAcento(p).trim()] = p; });
+  return m;
+})();
 
 const STORAGE_URL = 'bipador-url-v1';
 const URL_PADRAO = 'https://script.google.com/macros/s/AKfycbxdkNwsKkDTm6pPk-8mI2oirJ0Qtf-oDyeW-8d0rxnYDVWb8FG1F239wT0cfkejSAIO/exec';
@@ -162,10 +166,14 @@ function configurar() {
 function setFeedback(tipo, msg) { fb.className = 'feedback ' + tipo; fb.textContent = msg; }
 
 function reset() {
-  inP.value = ''; inS.value = '';
-  inP.classList.remove('ok'); inS.classList.remove('ok'); inS.classList.remove('invalid');
+  inP.value = '';
+  inS.value = '';
+  inP.classList.remove('ok');
+  inS.classList.remove('ok');
+  inS.classList.remove('invalid');
   inS.disabled = true;
-  s1.classList.remove('done'); s2.style.opacity = '0.4';
+  s1.classList.remove('done');
+  s2.style.opacity = '0.4';
   setFeedback('idle', 'Aguardando bip do pacote…');
   inP.focus();
 }
@@ -197,28 +205,33 @@ function _avancarParaPrateleira() {
 }
 
 inP.addEventListener('keydown', (e) => {
-  if (e.key === 'Enter' || e.key === 'Tab') { e.preventDefault(); _avancarParaPrateleira(); }
+  if (e.key === 'Enter' || e.key === 'Tab') {
+    e.preventDefault();
+    _avancarParaPrateleira();
+  }
 });
 
+// Retorna o nome canonico (sem acento, da lista) se valido. null se nao for.
+function canonicalPrateleira(valor) {
+  const k = _semAcento(valor).trim();
+  return _MAPA_PRATELEIRAS[k] || null;
+}
+
 function validarPrateleira(valor) {
-  return PRATELEIRAS_VALIDAS.indexOf(valor.trim()) !== -1;
+  return canonicalPrateleira(valor) !== null;
 }
 
 inS.addEventListener('input', () => {
   const v = inS.value.trim();
-  if (v.length === 0) {
-    inS.classList.remove('ok'); inS.classList.remove('invalid');
-    return;
-  }
+  if (v.length === 0) { inS.classList.remove('ok'); inS.classList.remove('invalid'); return; }
   if (validarPrateleira(v)) {
-    inS.classList.add('ok'); inS.classList.remove('invalid');
+    inS.classList.add('ok');
+    inS.classList.remove('invalid');
   } else {
-    const ehPrefixo = PRATELEIRAS_VALIDAS.some(p => p.startsWith(v));
-    if (!ehPrefixo) {
-      inS.classList.add('invalid'); inS.classList.remove('ok');
-    } else {
-      inS.classList.remove('ok'); inS.classList.remove('invalid');
-    }
+    const vNorm = _semAcento(v);
+    const ehPrefixo = PRATELEIRAS_VALIDAS.some(p => p.startsWith(vNorm));
+    if (!ehPrefixo) { inS.classList.add('invalid'); inS.classList.remove('ok'); }
+    else { inS.classList.remove('ok'); inS.classList.remove('invalid'); }
   }
 });
 
@@ -242,17 +255,17 @@ inS.addEventListener('keydown', (e) => {
 // O envio real acontece em background via enviarBip().
 function salvar() {
   const pacote = inP.value.trim();
-  const prateleira = inS.value.trim();
+  const prateleiraBruta = inS.value.trim();
+  const prateleira = canonicalPrateleira(prateleiraBruta);
 
-  if (!pacote || !validarPrateleira(prateleira)) {
+  if (!pacote || !prateleira) {
     setFeedback('error', '❌ Dados inválidos');
     return;
   }
-  if (!URL_SCRIPT) {
-    setFeedback('error', '⚙️ Configure a URL do script primeiro!');
-    return;
-  }
+  if (!URL_SCRIPT) { setFeedback('error', '⚙️ Configure a URL do script primeiro!'); return; }
 
+  // Sempre grava na planilha o nome canonico (sem acento), mesmo que o leitor
+  // tenha entregue uma versao com acento. Isso garante consistencia da base.
   const b = {
     id: _nextBipId++,
     pacote: pacote,
@@ -276,6 +289,7 @@ async function enviarBip(b) {
   b.status = 'enviando';
   b.msg = '';
   renderBips();
+
   try {
     const resp = await fetch(URL_SCRIPT, {
       method: 'POST',
@@ -324,9 +338,11 @@ function renderBips() {
     log.innerHTML = '<div style="color:#adb5bd;text-align:center;padding:20px">Nada ainda…</div>';
     return;
   }
+
   const icones = { enviando: '⏳', salvo: '✅', movido: '🔄', falhou: '❌' };
   const corBg = { enviando: '#e7f5ff', salvo: '#f0fff4', movido: '#fff9db', falhou: '#fff5f5' };
   const corBorda = { enviando: '#74c0fc', salvo: '#69db7c', movido: '#ffd43b', falhou: '#ff8787' };
+
   log.innerHTML = visiveis.map(b => {
     const hora = b.hora.toTimeString().slice(0, 5);
     const reenviar = b.status === 'falhou'
@@ -336,20 +352,22 @@ function renderBips() {
       ? '<div style="font-size:11px;color:#c92a2a;margin-top:2px">' + escapeHtml(b.msg) + '</div>'
       : '';
     return '<div class="log-item" style="background:' + corBg[b.status] + ';border-left:3px solid ' + corBorda[b.status] + ';padding-left:10px;border-bottom:1px solid #f1f3f5">'
-      + '<div style="flex:1;min-width:0">'
-      +   '<div class="code">' + icones[b.status] + ' ' + escapeHtml(b.pacote) + '</div>'
-      +   '<div style="font-size:11px;color:#868e96">' + hora + '</div>'
-      +   errMsg
-      + '</div>'
-      + '<div style="display:flex;align-items:center;gap:6px">'
-      +   '<div class="pr">' + escapeHtml(b.prateleira) + '</div>'
-      +   reenviar
-      + '</div>'
-      + '</div>';
+         + '<div style="flex:1;min-width:0">'
+         +   '<div class="code">' + icones[b.status] + ' ' + escapeHtml(b.pacote) + '</div>'
+         +   '<div style="font-size:11px;color:#868e96">' + hora + '</div>'
+         +   errMsg
+         + '</div>'
+         + '<div style="display:flex;align-items:center;gap:6px">'
+         +   '<div class="pr">' + escapeHtml(b.prateleira) + '</div>'
+         +   reenviar
+         + '</div>'
+         + '</div>';
   }).join('');
 }
 
-function escapeHtml(s) { return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
 
 // AudioContext reutilizado. Criado lazy e mantido vivo pra evitar bloqueio
 // de autoplay quando o beep eh disparado depois de um await (fetch).
@@ -358,9 +376,7 @@ function getAudioCtx() {
   if (!_audioCtx) {
     _audioCtx = new (window.AudioContext || window.webkitAudioContext)();
   }
-  if (_audioCtx.state === 'suspended') {
-    _audioCtx.resume().catch(() => {});
-  }
+  if (_audioCtx.state === 'suspended') { _audioCtx.resume().catch(() => {}); }
   return _audioCtx;
 }
 // Garante resume em qualquer interacao do usuario (clique/teclado)
@@ -421,6 +437,7 @@ function _aquecerScript() {
 }
 _aquecerScript();
 setInterval(_aquecerScript, 4 * 60 * 1000);
+
 </script>
 </body>
 </html>
