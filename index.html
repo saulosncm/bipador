@@ -44,9 +44,22 @@ input:disabled { background: #f1f3f5; }
   <button id="login-btn" style="padding:12px 32px;font-size:16px;background:#fff;color:#2d3277;border:none;border-radius:8px;cursor:pointer;font-weight:700">Entrar</button>
   <div id="login-erro" style="color:#ffd2d2;min-height:20px;font-size:14px;font-weight:600"></div>
 </div>
+
+<div id="operador-gate" style="display:none;position:fixed;inset:0;background:linear-gradient(135deg,#2d3277,#1864ab);z-index:9998;flex-direction:column;align-items:center;justify-content:center;gap:12px;padding:20px;overflow:auto">
+  <div style="font-size:48px">👤</div>
+  <h2 style="color:#fff;font-size:22px;font-weight:700;text-align:center">Quem está bipando?</h2>
+  <div id="operador-gate-botoes" style="display:flex;flex-direction:column;gap:8px;width:100%;max-width:280px"></div>
+  <div style="color:#dde7ff;font-size:13px;margin-top:8px">— ou —</div>
+  <input type="text" id="operador-outro-input" placeholder="Outro nome..." style="padding:12px 16px;font-size:16px;border-radius:8px;border:3px solid transparent;width:100%;max-width:280px;text-align:center;font-family:inherit">
+  <button onclick="_confirmarOperadorOutro()" style="padding:10px 24px;font-size:14px;background:#fff;color:#2d3277;border:none;border-radius:8px;cursor:pointer;font-weight:700">Entrar com outro nome</button>
+</div>
 <div class="wrap">
 <h1>📦 Bipar Pacote → Prateleira</h1>
 <div class="sub">Bipa pacote, bipa QR da prateleira, salva sozinho.</div>
+<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;font-size:13px;color:#495057;flex-wrap:wrap;gap:8px">
+  <div id="operador-display"></div>
+  <div id="fila-indicator" style="color:#1864ab;font-weight:600"></div>
+</div>
 <div class="card">
 <div class="step" id="s1">1. Pacote</div>
 <input type="text" id="pacote" placeholder="Bipe o código do pacote" autocomplete="off" autofocus>
@@ -71,7 +84,7 @@ input:disabled { background: #f1f3f5; }
 </div>
 <div class="config">
 <a onclick="configurar()">⚙️ Configurar URL do script</a> &nbsp;·&nbsp;
-<span style="color:#adb5bd">v12 (corrige Gond 1)</span>
+<span style="color:#adb5bd">v13.1 (operador na planilha G)</span>
 </div>
 </div>
 <script>
@@ -108,6 +121,121 @@ async function _entrar() {
   inp.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); _entrar(); } });
   setTimeout(() => inp.focus(), 100);
 })();
+
+// ===== OPERADOR =====
+const OPERADORES = ['Saulo','Rafael','Rebecca','Caio','Rosimere'];
+const STORAGE_OP = 'bipador-operador-v1';
+let _operador = localStorage.getItem(STORAGE_OP) || '';
+
+function _renderOperadorHeader() {
+  const el = document.getElementById('operador-display');
+  if (!el) return;
+  el.innerHTML = _operador
+    ? '👤 <b>' + escapeHtml(_operador) + '</b> · <a onclick="trocarOperador()" style="color:#3483fa;cursor:pointer;text-decoration:underline">trocar</a>'
+    : '<span style="color:#c92a2a">⚠️ Selecione o operador</span>';
+}
+function trocarOperador() {
+  _abrirOperadorGate();
+}
+window.trocarOperador = trocarOperador;
+function _selecionarOperador(nome) {
+  nome = String(nome || '').trim();
+  if (!nome) return;
+  _operador = nome;
+  localStorage.setItem(STORAGE_OP, nome);
+  document.getElementById('operador-gate').style.display = 'none';
+  _renderOperadorHeader();
+  if (typeof inP !== 'undefined') inP.focus();
+}
+window._selecionarOperador = _selecionarOperador;
+function _confirmarOperadorOutro() {
+  const v = document.getElementById('operador-outro-input').value;
+  if (v.trim().length < 2) { alert('Digite ao menos 2 letras'); return; }
+  _selecionarOperador(v);
+}
+window._confirmarOperadorOutro = _confirmarOperadorOutro;
+function _abrirOperadorGate() {
+  const cont = document.getElementById('operador-gate-botoes');
+  cont.innerHTML = OPERADORES.map(n =>
+    '<button onclick="_selecionarOperador(\''+n+'\')" style="padding:14px 16px;font-size:16px;background:#fff;color:#2d3277;border:none;border-radius:8px;cursor:pointer;font-weight:700;width:100%">' + n + '</button>'
+  ).join('');
+  document.getElementById('operador-gate').style.display = 'flex';
+  document.getElementById('operador-outro-input').value = '';
+}
+(function _initOperador() {
+  // Renderiza header agora
+  setTimeout(_renderOperadorHeader, 50);
+  // Mostra gate apos login (ou ja, se nao tem senha)
+  setTimeout(() => {
+    const gateLogin = document.getElementById('login-gate');
+    const semSenha = gateLogin && gateLogin.style.display === 'none';
+    if (!_operador && semSenha) _abrirOperadorGate();
+  }, 300);
+  // Tambem dispara apos login bem-sucedido
+  const observer = new MutationObserver(() => {
+    const g = document.getElementById('login-gate');
+    if (g && g.style.display === 'none' && !_operador) {
+      _abrirOperadorGate();
+      observer.disconnect();
+    }
+  });
+  const g = document.getElementById('login-gate');
+  if (g) observer.observe(g, { attributes: true, attributeFilter: ['style'] });
+})();
+
+// ===== INDEXEDDB =====
+const DB_NAME = 'agencia_ml';
+const DB_VERSION = 1;
+const STORE_BIPS = 'bips';
+let _db = null;
+function _abrirDB() {
+  return new Promise((resolve, reject) => {
+    if (_db) return resolve(_db);
+    const req = indexedDB.open(DB_NAME, DB_VERSION);
+    req.onupgradeneeded = (e) => {
+      const db = e.target.result;
+      if (!db.objectStoreNames.contains(STORE_BIPS)) {
+        const store = db.createObjectStore(STORE_BIPS, { keyPath: 'id' });
+        store.createIndex('data', 'data');
+        store.createIndex('operador', 'operador');
+        store.createIndex('prateleira', 'prateleira');
+        store.createIndex('status_envio_planilha', 'status_envio_planilha');
+      }
+    };
+    req.onsuccess = (e) => { _db = e.target.result; resolve(_db); };
+    req.onerror = (e) => reject(e.target.error);
+  });
+}
+function _idbSalvar(bip) {
+  return _abrirDB().then(db => new Promise((resolve, reject) => {
+    const tx = db.transaction([STORE_BIPS], 'readwrite');
+    tx.objectStore(STORE_BIPS).put(bip);
+    tx.oncomplete = () => resolve();
+    tx.onerror = (e) => reject(e.target.error);
+  }));
+}
+function _idbAtualizar(id, patch) {
+  return _abrirDB().then(db => new Promise((resolve, reject) => {
+    const tx = db.transaction([STORE_BIPS], 'readwrite');
+    const store = tx.objectStore(STORE_BIPS);
+    const req = store.get(id);
+    req.onsuccess = () => {
+      const obj = req.result;
+      if (obj) { Object.assign(obj, patch); store.put(obj); }
+    };
+    tx.oncomplete = () => resolve();
+    tx.onerror = (e) => reject(e.target.error);
+  }));
+}
+function _idbListarPendentes() {
+  return _abrirDB().then(db => new Promise((resolve, reject) => {
+    const tx = db.transaction([STORE_BIPS], 'readonly');
+    const idx = tx.objectStore(STORE_BIPS).index('status_envio_planilha');
+    const req = idx.getAll(IDBKeyRange.only('pendente'));
+    req.onsuccess = () => resolve(req.result || []);
+    req.onerror = (e) => reject(e.target.error);
+  }));
+}
 
 // ===== APP =====
 
@@ -333,11 +461,20 @@ function salvar() {
 
   // Sempre grava na planilha o nome canonico (sem acento), mesmo que o leitor
   // tenha entregue uma versao com acento. Isso garante consistencia da base.
+  if (!_operador) {
+    setFeedback('error', '❌ Selecione o operador antes de bipar');
+    _abrirOperadorGate();
+    return;
+  }
+  const idLocal = (crypto.randomUUID ? crypto.randomUUID() : (Date.now() + '-' + Math.random()));
+  const dataAtual = new Date();
   const b = {
     id: _nextBipId++,
+    idLocal: idLocal,
     pacote: pacote,
     prateleira: prateleira,
-    hora: new Date(),
+    operador: _operador,
+    hora: dataAtual,
     status: 'enviando',
     msg: ''
   };
@@ -345,10 +482,21 @@ function salvar() {
   renderBips();
   setFeedback('success', '⏳ Enviando ' + pacote + ' → ' + prateleira);
 
+  // Salva no IndexedDB imediatamente (sobrevive refresh / queda).
+  _idbSalvar({
+    id: idLocal,
+    pacote: pacote,
+    prateleira: prateleira,
+    operador: _operador,
+    data: dataAtual.toISOString(),
+    status_envio_planilha: 'pendente',
+    criado_em: dataAtual.toISOString()
+  }).catch(e => console.error('IDB salvar erro:', e));
+
   // Limpa imediatamente pra liberar próximo bip.
   setTimeout(() => reset(), 50);
 
-  // Dispara em background.
+  // Dispara em background pra Apps Script.
   enviarBip(b);
 }
 
@@ -361,26 +509,79 @@ async function enviarBip(b) {
     const resp = await fetch(URL_SCRIPT, {
       method: 'POST',
       headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-      body: JSON.stringify({ pacote: b.pacote, prateleira: b.prateleira })
+      body: JSON.stringify({ pacote: b.pacote, prateleira: b.prateleira, operador: b.operador })
     });
     const data = await resp.json();
     if (data.ok) {
       b.status = data.atualizado ? 'movido' : 'salvo';
       b.linha = data.linha;
       b.url = data.url;
+      _idbAtualizar(b.idLocal, { status_envio_planilha: 'sincronizado', linha: data.linha });
       beep(data.atualizado ? 'warn' : 'ok');
     } else {
+      // Backend rejeitou (validacao). Nao retenta.
       b.status = 'falhou';
       b.msg = data.erro || 'desconhecido';
+      _idbAtualizar(b.idLocal, { status_envio_planilha: 'rejeitado', erro: b.msg });
       beep('err');
     }
   } catch (err) {
-    b.status = 'falhou';
-    b.msg = err.message || 'falha de conexão';
-    beep('err');
+    // Erro de rede: marca como pendente; fila de retry vai tentar de novo.
+    b.status = 'pendente-planilha';
+    b.msg = err.message || 'sem conexão';
+    // status_envio_planilha continua 'pendente' no IDB.
   }
+  _atualizarIndicadorFila();
   renderBips();
 }
+
+// ===== RETRY LOOP =====
+let _retryRodando = false;
+async function _atualizarIndicadorFila() {
+  try {
+    const pendentes = await _idbListarPendentes();
+    const el = document.getElementById('fila-indicator');
+    if (el) el.textContent = pendentes.length ? ('📡 Fila: ' + pendentes.length + ' pendente' + (pendentes.length > 1 ? 's' : '')) : '';
+  } catch(e) {}
+}
+async function _processarFilaRetry() {
+  if (_retryRodando) return;
+  _retryRodando = true;
+  try {
+    const pendentes = await _idbListarPendentes();
+    for (const p of pendentes) {
+      try {
+        const resp = await fetch(URL_SCRIPT, {
+          method: 'POST',
+          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+          body: JSON.stringify({ pacote: p.pacote, prateleira: p.prateleira, operador: p.operador })
+        });
+        const data = await resp.json();
+        if (data.ok) {
+          await _idbAtualizar(p.id, { status_envio_planilha: 'sincronizado', linha: data.linha });
+          const inList = bips.find(b => b.idLocal === p.id);
+          if (inList) {
+            inList.status = data.atualizado ? 'movido' : 'salvo';
+            inList.linha = data.linha;
+            inList.url = data.url;
+            inList.msg = '';
+          }
+        } else {
+          await _idbAtualizar(p.id, { status_envio_planilha: 'rejeitado', erro: data.erro });
+          const inList = bips.find(b => b.idLocal === p.id);
+          if (inList) { inList.status = 'falhou'; inList.msg = data.erro || 'rejeitado'; }
+        }
+      } catch(e) { /* offline ainda — proximo ciclo */ }
+    }
+    await _atualizarIndicadorFila();
+    renderBips();
+  } finally {
+    _retryRodando = false;
+  }
+}
+setInterval(_processarFilaRetry, 30000);
+setTimeout(_processarFilaRetry, 2000);
+setTimeout(_atualizarIndicadorFila, 500);
 
 function reenviarBip(id) {
   const b = bips.find(x => x.id === id);
@@ -393,14 +594,15 @@ function renderBips() {
   // Contadores
   const c = { enviando: 0, salvo: 0, movido: 0, falhou: 0 };
   bips.forEach(b => { c[b.status] = (c[b.status] || 0) + 1; });
-  document.getElementById('cnt-salvos').textContent = c.salvo + c.movido;
+  document.getElementById('cnt-salvos').textContent = (c.salvo||0) + (c.movido||0) + (c['pendente-planilha']||0);
   document.getElementById('cnt-enviando').textContent = c.enviando;
   document.getElementById('cnt-falhas').textContent = c.falhou;
 
-  // Lista: TODOS os falhou (até serem reenviados com sucesso) + 10 últimos não-falhou
+  // Lista: TODOS os falhou + TODOS os pendentes (ate sincronizar) + 10 ultimos demais
   const falhou = bips.filter(b => b.status === 'falhou');
-  const outros = bips.filter(b => b.status !== 'falhou').slice(0, 10);
-  const visiveis = falhou.concat(outros).sort((a, b) => b.id - a.id);
+  const pendentes = bips.filter(b => b.status === 'pendente-planilha');
+  const outros = bips.filter(b => b.status !== 'falhou' && b.status !== 'pendente-planilha').slice(0, 10);
+  const visiveis = falhou.concat(pendentes).concat(outros).sort((a, b) => b.id - a.id);
 
   const log = document.getElementById('lista-bips');
   if (visiveis.length === 0) {
@@ -408,9 +610,9 @@ function renderBips() {
     return;
   }
 
-  const icones = { enviando: '⏳', salvo: '✅', movido: '🔄', falhou: '❌' };
-  const corBg = { enviando: '#e7f5ff', salvo: '#f0fff4', movido: '#fff9db', falhou: '#fff5f5' };
-  const corBorda = { enviando: '#74c0fc', salvo: '#69db7c', movido: '#ffd43b', falhou: '#ff8787' };
+  const icones = { enviando: '⏳', salvo: '✅', movido: '🔄', falhou: '❌', 'pendente-planilha': '✅' };
+  const corBg = { enviando: '#e7f5ff', salvo: '#f0fff4', movido: '#fff9db', falhou: '#fff5f5', 'pendente-planilha': '#fff9db' };
+  const corBorda = { enviando: '#74c0fc', salvo: '#69db7c', movido: '#ffd43b', falhou: '#ff8787', 'pendente-planilha': '#ffa94d' };
 
   log.innerHTML = visiveis.map(b => {
     const hora = b.hora.toTimeString().slice(0, 5);
@@ -423,11 +625,15 @@ function renderBips() {
     const linhaInfo = (b.status === 'salvo' || b.status === 'movido') && b.linha
       ? ' <span style="font-size:11px;color:#868e96">linha ' + b.linha + (b.url ? ' <a href="' + escapeHtml(b.url) + '" target="_blank" rel="noopener" style="color:#3483fa;text-decoration:none" title="Abrir na planilha">↗</a>' : '') + '</span>'
       : '';
+    const pendenteAviso = b.status === 'pendente-planilha'
+      ? '<div style="font-size:11px;color:#d9480f;margin-top:2px">📡 Pendente envio para planilha — retentando...</div>'
+      : '';
     return '<div class="log-item" style="background:' + corBg[b.status] + ';border-left:3px solid ' + corBorda[b.status] + ';padding-left:10px;border-bottom:1px solid #f1f3f5">'
          + '<div style="flex:1;min-width:0">'
          +   '<div class="code">' + icones[b.status] + ' ' + escapeHtml(b.pacote) + '</div>'
          +   '<div style="font-size:11px;color:#868e96">' + hora + linhaInfo + '</div>'
          +   errMsg
+         +   pendenteAviso
          + '</div>'
          + '<div style="display:flex;align-items:center;gap:6px">'
          +   '<div class="pr">' + escapeHtml(b.prateleira) + '</div>'
