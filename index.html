@@ -6,7 +6,10 @@
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; }
 body { font-family: -apple-system, Segoe UI, Roboto, sans-serif; background: #f1f3f5; min-height: 100vh; padding: 20px; }
-.wrap { max-width: 600px; margin: 0 auto; }
+.wrap { max-width: 1100px; margin: 0 auto; }
+.grid-2col { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; align-items: start; }
+@media (max-width: 820px) { .grid-2col { grid-template-columns: 1fr; } }
+.col-direita { display: flex; flex-direction: column; gap: 12px; }
 h1 { color: #2d3277; margin-bottom: 4px; font-size: 22px; }
 .sub { color: #868e96; font-size: 13px; margin-bottom: 20px; }
 .card { background: #fff; padding: 24px; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); margin-bottom: 16px; }
@@ -60,31 +63,37 @@ input:disabled { background: #f1f3f5; }
   <div id="operador-display"></div>
   <div id="fila-indicator" style="color:#1864ab;font-weight:600"></div>
 </div>
-<div class="card">
-<div class="step" id="s1">1. Pacote</div>
-<input type="text" id="pacote" placeholder="Bipe o código do pacote" autocomplete="off" autofocus>
-<div style="height: 14px"></div>
-<div class="step" id="s2" style="opacity:0.4">2. Prateleira (bipe o QR)</div>
-<input type="text" id="prateleira" placeholder="Bipe o QR da prateleira" autocomplete="off" disabled>
-<div class="feedback idle" id="fb">Aguardando bip do pacote…</div>
-<button id="btn-cancelar-erro" onclick="cancelarBipAtual()" style="display:none;margin-top:10px;width:100%;padding:12px;background:#fff;border:2px solid #c92a2a;color:#c92a2a;border-radius:8px;cursor:pointer;font-weight:700;font-size:14px">✕ Cancelar bip atual e recomeçar</button>
-<div id="debug-panel" style="display:none;margin-top:10px;padding:12px;background:#fff5f5;border:1px solid #ffc9c9;border-radius:8px;font-size:13px;color:#495057"></div>
+<div class="grid-2col">
+<div>
+  <div class="card">
+    <div class="step" id="s1">1. Pacote</div>
+    <input type="text" id="pacote" placeholder="Bipe o código do pacote" autocomplete="off" autofocus>
+    <div style="height: 14px"></div>
+    <div class="step" id="s2" style="opacity:0.4">2. Prateleira (bipe o QR)</div>
+    <input type="text" id="prateleira" placeholder="Bipe o QR da prateleira" autocomplete="off" disabled>
+    <div class="feedback idle" id="fb">Aguardando bip do pacote…</div>
+    <button id="btn-cancelar-erro" onclick="cancelarBipAtual()" style="display:none;margin-top:10px;width:100%;padding:12px;background:#fff;border:2px solid #c92a2a;color:#c92a2a;border-radius:8px;cursor:pointer;font-weight:700;font-size:14px">✕ Cancelar bip atual e recomeçar</button>
+    <div id="debug-panel" style="display:none;margin-top:10px;padding:12px;background:#fff5f5;border:1px solid #ffc9c9;border-radius:8px;font-size:13px;color:#495057"></div>
+  </div>
+  <div class="stats">
+    <div class="stat" style="background:#d3f9d8"><div class="n" id="cnt-salvos" style="color:#2b8a3e">0</div><div class="l">✅ Salvos</div></div>
+    <div class="stat" style="background:#e7f5ff"><div class="n" id="cnt-enviando" style="color:#1864ab">0</div><div class="l">⏳ Enviando</div></div>
+    <div class="stat" style="background:#ffe3e3"><div class="n" id="cnt-falhas" style="color:#c92a2a">0</div><div class="l">❌ Falhas</div></div>
+  </div>
+  <div style="margin-top:16px;display:flex;gap:8px;justify-content:center">
+    <button onclick="beep('ok')" style="padding:8px 12px;border:1px solid #2b8a3e;background:#d3f9d8;color:#2b8a3e;border-radius:6px;cursor:pointer;font-weight:600">🔊 Testar sucesso</button>
+    <button onclick="beep('warn')" style="padding:8px 12px;border:1px solid #846503;background:#fff9db;color:#846503;border-radius:6px;cursor:pointer;font-weight:600">🔊 Testar aviso</button>
+    <button onclick="beep('err')" style="padding:8px 12px;border:1px solid #c92a2a;background:#ffe3e3;color:#c92a2a;border-radius:6px;cursor:pointer;font-weight:600">🔊 Testar erro</button>
+  </div>
 </div>
-<div class="stats">
-<div class="stat" style="background:#d3f9d8"><div class="n" id="cnt-salvos" style="color:#2b8a3e">0</div><div class="l">✅ Salvos</div></div>
-<div class="stat" style="background:#e7f5ff"><div class="n" id="cnt-enviando" style="color:#1864ab">0</div><div class="l">⏳ Enviando</div></div>
-<div class="stat" style="background:#ffe3e3"><div class="n" id="cnt-falhas" style="color:#c92a2a">0</div><div class="l">❌ Falhas</div></div>
+<div class="col-direita">
+  <div class="step" style="background:#f1f3f5;color:#495057">📋 Bipagens (10 últimas + erros + falhas persistentes)</div>
+  <div class="log" id="lista-bips" style="max-height:520px"><div style="color:#adb5bd;text-align:center;padding:20px">Nada ainda…</div></div>
 </div>
-<div style="margin-top:16px"><div class="step" style="background:#f1f3f5;color:#495057">📋 Bipagens (10 últimas + erros)</div></div>
-<div class="log" id="lista-bips"><div style="color:#adb5bd;text-align:center;padding:20px">Nada ainda…</div></div>
-<div style="margin-top:16px;display:flex;gap:8px;justify-content:center">
-<button onclick="beep('ok')" style="padding:8px 12px;border:1px solid #2b8a3e;background:#d3f9d8;color:#2b8a3e;border-radius:6px;cursor:pointer;font-weight:600">🔊 Testar sucesso</button>
-<button onclick="beep('warn')" style="padding:8px 12px;border:1px solid #846503;background:#fff9db;color:#846503;border-radius:6px;cursor:pointer;font-weight:600">🔊 Testar aviso</button>
-<button onclick="beep('err')" style="padding:8px 12px;border:1px solid #c92a2a;background:#ffe3e3;color:#c92a2a;border-radius:6px;cursor:pointer;font-weight:600">🔊 Testar erro</button>
 </div>
 <div class="config">
 <a onclick="configurar()">⚙️ Configurar URL do script</a> &nbsp;·&nbsp;
-<span style="color:#adb5bd">v13.1 (operador na planilha G)</span>
+<span style="color:#adb5bd">v15.1 (auto-retry 3x a cada 1min)</span>
 </div>
 </div>
 <script>
@@ -236,6 +245,36 @@ function _idbListarPendentes() {
     req.onerror = (e) => reject(e.target.error);
   }));
 }
+function _idbListarRejeitados() {
+  return _abrirDB().then(db => new Promise((resolve, reject) => {
+    const tx = db.transaction([STORE_BIPS], 'readonly');
+    const idx = tx.objectStore(STORE_BIPS).index('status_envio_planilha');
+    const req = idx.getAll(IDBKeyRange.only('rejeitado'));
+    req.onsuccess = () => resolve(req.result || []);
+    req.onerror = (e) => reject(e.target.error);
+  }));
+}
+async function _carregarFalhasHistoricas() {
+  try {
+    const rejeitados = await _idbListarRejeitados();
+    rejeitados.forEach(r => {
+      if (bips.find(b => b.idLocal === r.id)) return;
+      bips.push({
+        id: _nextBipId++,
+        idLocal: r.id,
+        pacote: r.pacote,
+        prateleira: r.prateleira,
+        operador: r.operador,
+        hora: r.data ? new Date(r.data) : new Date(),
+        status: 'falhou',
+        msg: r.erro || 'rejeitado anteriormente',
+        tentativas: r.tentativas || 3
+      });
+    });
+    renderBips();
+  } catch(e) { console.error('Erro carregar falhas:', e); }
+}
+setTimeout(_carregarFalhasHistoricas, 1000);
 
 // ===== APP =====
 
@@ -490,6 +529,8 @@ function salvar() {
     operador: _operador,
     data: dataAtual.toISOString(),
     status_envio_planilha: 'pendente',
+    tentativas: 0,
+    proxima_tentativa: 0,
     criado_em: dataAtual.toISOString()
   }).catch(e => console.error('IDB salvar erro:', e));
 
@@ -519,17 +560,31 @@ async function enviarBip(b) {
       _idbAtualizar(b.idLocal, { status_envio_planilha: 'sincronizado', linha: data.linha });
       beep(data.atualizado ? 'warn' : 'ok');
     } else {
-      // Backend rejeitou (validacao). Nao retenta.
-      b.status = 'falhou';
+      // Backend rejeitou. Conta como 1 tentativa; reagenda ou termina.
+      b.tentativas = (b.tentativas || 0) + 1;
       b.msg = data.erro || 'desconhecido';
-      _idbAtualizar(b.idLocal, { status_envio_planilha: 'rejeitado', erro: b.msg });
-      beep('err');
+      if (b.tentativas >= 3) {
+        b.status = 'falhou';
+        _idbAtualizar(b.idLocal, { status_envio_planilha: 'rejeitado', tentativas: b.tentativas, erro: b.msg });
+        beep('err');
+      } else {
+        b.status = 'pendente-planilha';
+        const prox = Date.now() + 60000;
+        _idbAtualizar(b.idLocal, { status_envio_planilha: 'pendente', tentativas: b.tentativas, proxima_tentativa: prox, erro: b.msg });
+      }
     }
   } catch (err) {
-    // Erro de rede: marca como pendente; fila de retry vai tentar de novo.
-    b.status = 'pendente-planilha';
+    // Erro de rede: conta tentativa; reagenda ou termina.
+    b.tentativas = (b.tentativas || 0) + 1;
     b.msg = err.message || 'sem conexão';
-    // status_envio_planilha continua 'pendente' no IDB.
+    if (b.tentativas >= 3) {
+      b.status = 'falhou';
+      _idbAtualizar(b.idLocal, { status_envio_planilha: 'rejeitado', tentativas: b.tentativas, erro: b.msg });
+    } else {
+      b.status = 'pendente-planilha';
+      const prox = Date.now() + 60000;
+      _idbAtualizar(b.idLocal, { status_envio_planilha: 'pendente', tentativas: b.tentativas, proxima_tentativa: prox, erro: b.msg });
+    }
   }
   _atualizarIndicadorFila();
   renderBips();
@@ -548,8 +603,12 @@ async function _processarFilaRetry() {
   if (_retryRodando) return;
   _retryRodando = true;
   try {
-    const pendentes = await _idbListarPendentes();
+    const todos = await _idbListarPendentes();
+    const agora = Date.now();
+    // Filtra os que ja passaram do tempo de proxima_tentativa
+    const pendentes = todos.filter(p => !p.proxima_tentativa || p.proxima_tentativa <= agora);
     for (const p of pendentes) {
+      const novaTentativa = (p.tentativas || 0) + 1;
       try {
         const resp = await fetch(URL_SCRIPT, {
           method: 'POST',
@@ -565,13 +624,30 @@ async function _processarFilaRetry() {
             inList.linha = data.linha;
             inList.url = data.url;
             inList.msg = '';
+            inList.tentativas = novaTentativa;
           }
         } else {
-          await _idbAtualizar(p.id, { status_envio_planilha: 'rejeitado', erro: data.erro });
-          const inList = bips.find(b => b.idLocal === p.id);
-          if (inList) { inList.status = 'falhou'; inList.msg = data.erro || 'rejeitado'; }
+          // Falhou. Decide se reagenda ou termina.
+          if (novaTentativa >= 3) {
+            await _idbAtualizar(p.id, { status_envio_planilha: 'rejeitado', tentativas: novaTentativa, erro: data.erro });
+            const inList = bips.find(b => b.idLocal === p.id);
+            if (inList) { inList.status = 'falhou'; inList.msg = data.erro || 'rejeitado'; inList.tentativas = novaTentativa; }
+          } else {
+            await _idbAtualizar(p.id, { tentativas: novaTentativa, proxima_tentativa: agora + 60000, erro: data.erro });
+            const inList = bips.find(b => b.idLocal === p.id);
+            if (inList) { inList.status = 'pendente-planilha'; inList.msg = data.erro; inList.tentativas = novaTentativa; }
+          }
         }
-      } catch(e) { /* offline ainda — proximo ciclo */ }
+      } catch(e) {
+        // Erro de rede no retry. Mesma logica.
+        if (novaTentativa >= 3) {
+          await _idbAtualizar(p.id, { status_envio_planilha: 'rejeitado', tentativas: novaTentativa, erro: e.message });
+          const inList = bips.find(b => b.idLocal === p.id);
+          if (inList) { inList.status = 'falhou'; inList.msg = e.message; inList.tentativas = novaTentativa; }
+        } else {
+          await _idbAtualizar(p.id, { tentativas: novaTentativa, proxima_tentativa: agora + 60000, erro: e.message });
+        }
+      }
     }
     await _atualizarIndicadorFila();
     renderBips();
@@ -586,6 +662,12 @@ setTimeout(_atualizarIndicadorFila, 500);
 function reenviarBip(id) {
   const b = bips.find(x => x.id === id);
   if (!b) return;
+  // Reset manual: zera tentativas e re-tenta como bip novo
+  b.tentativas = 0;
+  if (b.idLocal) _idbAtualizar(b.idLocal, { status_envio_planilha: 'pendente', tentativas: 0, proxima_tentativa: 0 }).catch(()=>{});
+  b.status = 'enviando';
+  b.msg = '';
+  renderBips();
   enviarBip(b);
 }
 window.reenviarBip = reenviarBip;
