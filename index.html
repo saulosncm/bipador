@@ -93,7 +93,7 @@ input:disabled { background: #f1f3f5; }
 </div>
 <div class="config">
 <a onclick="configurar()">⚙️ Configurar URL do script</a> &nbsp;·&nbsp;
-<span style="color:#adb5bd">v15.3 (mostra origem→destino quando movido)</span>
+<span style="color:#adb5bd">v15.4 (5 tentativas, backoff 20/40/80/160s, retry ao voltar pra aba)</span>
 </div>
 </div>
 <script>
@@ -564,13 +564,13 @@ async function enviarBip(b) {
       // Backend rejeitou. Conta como 1 tentativa; reagenda ou termina.
       b.tentativas = (b.tentativas || 0) + 1;
       b.msg = data.erro || 'desconhecido';
-      if (b.tentativas >= 3) {
+      if (b.tentativas >= MAX_TENTATIVAS) {
         b.status = 'falhou';
         _idbAtualizar(b.idLocal, { status_envio_planilha: 'rejeitado', tentativas: b.tentativas, erro: b.msg });
         beep('err');
       } else {
         b.status = 'pendente-planilha';
-        const prox = Date.now() + 20000;
+        const prox = Date.now() + _backoffMs(b.tentativas);
         _idbAtualizar(b.idLocal, { status_envio_planilha: 'pendente', tentativas: b.tentativas, proxima_tentativa: prox, erro: b.msg });
       }
     }
@@ -578,12 +578,12 @@ async function enviarBip(b) {
     // Erro de rede: conta tentativa; reagenda ou termina.
     b.tentativas = (b.tentativas || 0) + 1;
     b.msg = err.message || 'sem conexão';
-    if (b.tentativas >= 3) {
+    if (b.tentativas >= MAX_TENTATIVAS) {
       b.status = 'falhou';
       _idbAtualizar(b.idLocal, { status_envio_planilha: 'rejeitado', tentativas: b.tentativas, erro: b.msg });
     } else {
       b.status = 'pendente-planilha';
-      const prox = Date.now() + 20000;
+      const prox = Date.now() + _backoffMs(b.tentativas);
       _idbAtualizar(b.idLocal, { status_envio_planilha: 'pendente', tentativas: b.tentativas, proxima_tentativa: prox, erro: b.msg });
     }
   }
@@ -592,6 +592,11 @@ async function enviarBip(b) {
 }
 
 // ===== RETRY LOOP =====
+// Backoff exponencial: 1a falha = 20s, 2a = 40s, 3a = 80s, 4a = 160s (max 5min).
+const MAX_TENTATIVAS = 5;
+function _backoffMs(tentativasFalhadas) {
+  return Math.min(20000 * Math.pow(2, tentativasFalhadas - 1), 300000);
+}
 let _retryRodando = false;
 async function _atualizarIndicadorFila() {
   try {
@@ -630,24 +635,24 @@ async function _processarFilaRetry() {
           }
         } else {
           // Falhou. Decide se reagenda ou termina.
-          if (novaTentativa >= 3) {
+          if (novaTentativa >= MAX_TENTATIVAS) {
             await _idbAtualizar(p.id, { status_envio_planilha: 'rejeitado', tentativas: novaTentativa, erro: data.erro });
             const inList = bips.find(b => b.idLocal === p.id);
             if (inList) { inList.status = 'falhou'; inList.msg = data.erro || 'rejeitado'; inList.tentativas = novaTentativa; }
           } else {
-            await _idbAtualizar(p.id, { tentativas: novaTentativa, proxima_tentativa: agora + 20000, erro: data.erro });
+            await _idbAtualizar(p.id, { tentativas: novaTentativa, proxima_tentativa: agora + _backoffMs(novaTentativa), erro: data.erro });
             const inList = bips.find(b => b.idLocal === p.id);
             if (inList) { inList.status = 'pendente-planilha'; inList.msg = data.erro; inList.tentativas = novaTentativa; }
           }
         }
       } catch(e) {
         // Erro de rede no retry. Mesma logica.
-        if (novaTentativa >= 3) {
+        if (novaTentativa >= MAX_TENTATIVAS) {
           await _idbAtualizar(p.id, { status_envio_planilha: 'rejeitado', tentativas: novaTentativa, erro: e.message });
           const inList = bips.find(b => b.idLocal === p.id);
           if (inList) { inList.status = 'falhou'; inList.msg = e.message; inList.tentativas = novaTentativa; }
         } else {
-          await _idbAtualizar(p.id, { tentativas: novaTentativa, proxima_tentativa: agora + 20000, erro: e.message });
+          await _idbAtualizar(p.id, { tentativas: novaTentativa, proxima_tentativa: agora + _backoffMs(novaTentativa), erro: e.message });
         }
       }
     }
@@ -660,6 +665,15 @@ async function _processarFilaRetry() {
 setInterval(_processarFilaRetry, 10000);
 setTimeout(_processarFilaRetry, 2000);
 setTimeout(_atualizarIndicadorFila, 500);
+
+// Quando a aba volta ao foco, dispara varredura imediata da fila
+// (setInterval pode ter sido pausado pelo navegador em background).
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible') {
+    _processarFilaRetry();
+    _atualizarIndicadorFila();
+  }
+});
 
 function reenviarBip(id) {
   const b = bips.find(x => x.id === id);
@@ -786,23 +800,4 @@ function beep(tipo) {
 document.addEventListener('click', (e) => {
   if (e.target.tagName !== 'INPUT' && e.target.tagName !== 'A' && e.target.tagName !== 'BUTTON') {
     if (!inS.disabled && !inS.value) inS.focus();
-    else if (!inP.value) inP.focus();
-  }
-});
-
-// ===== AQUECIMENTO DO APPS SCRIPT =====
-// Google "esfria" o script após alguns minutos de inatividade. Quando isso
-// acontece, o próximo POST demora ~3-5s a mais só pra acordar. Pra evitar:
-// fazemos um GET silencioso ao carregar a página + a cada 4 minutos enquanto
-// a aba estiver aberta.
-function _aquecerScript() {
-  if (!URL_SCRIPT) return;
-  fetch(URL_SCRIPT, { method: 'GET', cache: 'no-store' })
-    .then(r => r.text()).catch(() => {});
-}
-_aquecerScript();
-setInterval(_aquecerScript, 4 * 60 * 1000);
-
-</script>
-</body>
-</html>
+    else if (!inP.value) inP.foc
