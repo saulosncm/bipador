@@ -93,7 +93,7 @@ input:disabled { background: #f1f3f5; }
 </div>
 <div class="config">
 <a onclick="configurar()">⚙️ Configurar URL do script</a> &nbsp;·&nbsp;
-<span style="color:#adb5bd">v15.2 (auto-retry 3x a cada 20s)</span>
+<span style="color:#adb5bd">v15.3 (mostra origem→destino quando movido)</span>
 </div>
 </div>
 <script>
@@ -557,7 +557,8 @@ async function enviarBip(b) {
       b.status = data.atualizado ? 'movido' : 'salvo';
       b.linha = data.linha;
       b.url = data.url;
-      _idbAtualizar(b.idLocal, { status_envio_planilha: 'sincronizado', linha: data.linha });
+      if (data.prateleiraAnterior) b.prateleiraAnterior = data.prateleiraAnterior;
+      _idbAtualizar(b.idLocal, { status_envio_planilha: 'sincronizado', linha: data.linha, prateleiraAnterior: data.prateleiraAnterior || '' });
       beep(data.atualizado ? 'warn' : 'ok');
     } else {
       // Backend rejeitou. Conta como 1 tentativa; reagenda ou termina.
@@ -617,12 +618,13 @@ async function _processarFilaRetry() {
         });
         const data = await resp.json();
         if (data.ok) {
-          await _idbAtualizar(p.id, { status_envio_planilha: 'sincronizado', linha: data.linha });
+          await _idbAtualizar(p.id, { status_envio_planilha: 'sincronizado', linha: data.linha, prateleiraAnterior: data.prateleiraAnterior || '' });
           const inList = bips.find(b => b.idLocal === p.id);
           if (inList) {
             inList.status = data.atualizado ? 'movido' : 'salvo';
             inList.linha = data.linha;
             inList.url = data.url;
+            if (data.prateleiraAnterior) inList.prateleiraAnterior = data.prateleiraAnterior;
             inList.msg = '';
             inList.tentativas = novaTentativa;
           }
@@ -710,6 +712,9 @@ function renderBips() {
     const pendenteAviso = b.status === 'pendente-planilha'
       ? '<div style="font-size:11px;color:#d9480f;margin-top:2px">📡 Pendente envio para planilha — retentando...</div>'
       : '';
+    const prateleiraDisplay = (b.status === 'movido' && b.prateleiraAnterior)
+      ? '<span style="font-size:11px;opacity:0.75">' + escapeHtml(b.prateleiraAnterior) + '</span> <span style="opacity:0.6">→</span> ' + escapeHtml(b.prateleira)
+      : escapeHtml(b.prateleira);
     return '<div class="log-item" style="background:' + corBg[b.status] + ';border-left:3px solid ' + corBorda[b.status] + ';padding-left:10px;border-bottom:1px solid #f1f3f5">'
          + '<div style="flex:1;min-width:0">'
          +   '<div class="code">' + icones[b.status] + ' ' + escapeHtml(b.pacote) + '</div>'
@@ -718,7 +723,7 @@ function renderBips() {
          +   pendenteAviso
          + '</div>'
          + '<div style="display:flex;align-items:center;gap:6px">'
-         +   '<div class="pr">' + escapeHtml(b.prateleira) + '</div>'
+         +   '<div class="pr">' + prateleiraDisplay + '</div>'
          +   reenviar
          + '</div>'
          + '</div>';
