@@ -93,7 +93,7 @@ input:disabled { background: #f1f3f5; }
 </div>
 <div class="config">
 <a onclick="configurar()">⚙️ Configurar URL do script</a> &nbsp;·&nbsp;
-<span style="color:#adb5bd">v15.1 (auto-retry 3x a cada 1min)</span>
+<span style="color:#adb5bd">v15.2 (auto-retry 3x a cada 20s)</span>
 </div>
 </div>
 <script>
@@ -569,7 +569,7 @@ async function enviarBip(b) {
         beep('err');
       } else {
         b.status = 'pendente-planilha';
-        const prox = Date.now() + 60000;
+        const prox = Date.now() + 20000;
         _idbAtualizar(b.idLocal, { status_envio_planilha: 'pendente', tentativas: b.tentativas, proxima_tentativa: prox, erro: b.msg });
       }
     }
@@ -582,7 +582,7 @@ async function enviarBip(b) {
       _idbAtualizar(b.idLocal, { status_envio_planilha: 'rejeitado', tentativas: b.tentativas, erro: b.msg });
     } else {
       b.status = 'pendente-planilha';
-      const prox = Date.now() + 60000;
+      const prox = Date.now() + 20000;
       _idbAtualizar(b.idLocal, { status_envio_planilha: 'pendente', tentativas: b.tentativas, proxima_tentativa: prox, erro: b.msg });
     }
   }
@@ -633,7 +633,7 @@ async function _processarFilaRetry() {
             const inList = bips.find(b => b.idLocal === p.id);
             if (inList) { inList.status = 'falhou'; inList.msg = data.erro || 'rejeitado'; inList.tentativas = novaTentativa; }
           } else {
-            await _idbAtualizar(p.id, { tentativas: novaTentativa, proxima_tentativa: agora + 60000, erro: data.erro });
+            await _idbAtualizar(p.id, { tentativas: novaTentativa, proxima_tentativa: agora + 20000, erro: data.erro });
             const inList = bips.find(b => b.idLocal === p.id);
             if (inList) { inList.status = 'pendente-planilha'; inList.msg = data.erro; inList.tentativas = novaTentativa; }
           }
@@ -645,7 +645,7 @@ async function _processarFilaRetry() {
           const inList = bips.find(b => b.idLocal === p.id);
           if (inList) { inList.status = 'falhou'; inList.msg = e.message; inList.tentativas = novaTentativa; }
         } else {
-          await _idbAtualizar(p.id, { tentativas: novaTentativa, proxima_tentativa: agora + 60000, erro: e.message });
+          await _idbAtualizar(p.id, { tentativas: novaTentativa, proxima_tentativa: agora + 20000, erro: e.message });
         }
       }
     }
@@ -655,7 +655,7 @@ async function _processarFilaRetry() {
     _retryRodando = false;
   }
 }
-setInterval(_processarFilaRetry, 30000);
+setInterval(_processarFilaRetry, 10000);
 setTimeout(_processarFilaRetry, 2000);
 setTimeout(_atualizarIndicadorFila, 500);
 
