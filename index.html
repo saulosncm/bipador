@@ -800,4 +800,23 @@ function beep(tipo) {
 document.addEventListener('click', (e) => {
   if (e.target.tagName !== 'INPUT' && e.target.tagName !== 'A' && e.target.tagName !== 'BUTTON') {
     if (!inS.disabled && !inS.value) inS.focus();
-    else if (!inP.value) inP.foc
+    else if (!inP.value) inP.focus();
+  }
+});
+
+// ===== AQUECIMENTO DO APPS SCRIPT =====
+// Google "esfria" o script após alguns minutos de inatividade. Quando isso
+// acontece, o próximo POST demora ~3-5s a mais só pra acordar. Pra evitar:
+// fazemos um GET silencioso ao carregar a página + a cada 4 minutos enquanto
+// a aba estiver aberta.
+function _aquecerScript() {
+  if (!URL_SCRIPT) return;
+  fetch(URL_SCRIPT, { method: 'GET', cache: 'no-store' })
+    .then(r => r.text()).catch(() => {});
+}
+_aquecerScript();
+setInterval(_aquecerScript, 4 * 60 * 1000);
+
+</script>
+</body>
+</html>
