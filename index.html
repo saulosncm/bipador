@@ -101,6 +101,9 @@ select:focus { outline: none; border-color: #3483fa; }
       <button onclick="_carregarSemPrateleira()" style="padding:6px 12px;border:1px solid #846503;background:#fff;color:#846503;border-radius:6px;cursor:pointer;font-weight:600;font-size:12px;white-space:nowrap">🔎 Buscar agora</button>
     </div>
     <div id="lista-sem-prateleira" style="display:none;margin-top:10px;max-height:240px;overflow-y:auto;font-family:monospace;font-size:13px;color:#495057"></div>
+    <div style="margin-top:6px;font-size:11px;color:#adb5bd;text-align:right">
+      <a onclick="_configurarUrlPendentes()" style="color:#868e96;cursor:pointer;text-decoration:underline">configurar URL</a>
+    </div>
   </div>
   <div style="margin-top:16px;display:flex;gap:8px;justify-content:center">
     <button onclick="beep('ok')" style="padding:8px 12px;border:1px solid #2b8a3e;background:#d3f9d8;color:#2b8a3e;border-radius:6px;cursor:pointer;font-weight:600">🔊 Testar sucesso</button>
@@ -866,27 +869,36 @@ _aquecerScript();
 setInterval(_aquecerScript, 4 * 60 * 1000);
 
 // ===== PACOTES SEM PRATELEIRA =====
-// Usa a MESMA URL da bipagem (URL_SCRIPT), chamando ?action=pendentes —
-// uma rota nova e so-leitura dentro do mesmo doGet do Apps Script "Bipador
-// Pacotes". O doPost (fluxo de salvar/mover) nao foi alterado. So busca
-// quando:
+// Usa um Apps Script SEPARADO (so-leitura, sem doPost) — nao tem nenhuma
+// ligacao com o script da bipagem normal (URL_SCRIPT). So busca quando:
 // 1) o usuario confirma a pergunta que aparece uma vez ao abrir a aba, ou
 // 2) o usuario clica no botao "Buscar agora".
 // Nunca busca sozinho em segundo plano / em intervalo.
+const STORAGE_URL_PENDENTES = 'bipador-url-pendentes-v1';
+let URL_SCRIPT_PENDENTES = localStorage.getItem(STORAGE_URL_PENDENTES) || '';
 let _semPrateleiraLista = null;
 let _semPrateleiraAberto = false;
 let _perguntouSemPrateleira = false;
 
+function _configurarUrlPendentes() {
+  const u = prompt('Cole a URL do script "Pacotes sem prateleira" (termina em /exec):', URL_SCRIPT_PENDENTES);
+  if (u !== null) {
+    URL_SCRIPT_PENDENTES = u.trim();
+    localStorage.setItem(STORAGE_URL_PENDENTES, URL_SCRIPT_PENDENTES);
+    if (URL_SCRIPT_PENDENTES) alert('URL salva! Clique em "Buscar agora" pra testar.');
+  }
+}
+window._configurarUrlPendentes = _configurarUrlPendentes;
+
 async function _carregarSemPrateleira() {
-  if (!URL_SCRIPT) {
-    alert('Configure primeiro a URL do script (link "Configurar URL do script" no rodapé).');
+  if (!URL_SCRIPT_PENDENTES) {
+    alert('Configure primeiro a URL do script "Pacotes sem prateleira" (link "configurar URL" abaixo do botão).');
     return;
   }
   const cnt = document.getElementById('cnt-sem-prateleira');
   if (cnt) cnt.textContent = '...';
   try {
-    const sep = URL_SCRIPT.indexOf('?') === -1 ? '?' : '&';
-    const resp = await fetch(URL_SCRIPT + sep + 'action=pendentes', { method: 'GET', cache: 'no-store' });
+    const resp = await fetch(URL_SCRIPT_PENDENTES, { method: 'GET', cache: 'no-store' });
     const data = await resp.json();
     if (data && data.ok && Array.isArray(data.pendentes)) {
       _semPrateleiraLista = data.pendentes;
