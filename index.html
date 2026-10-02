@@ -875,7 +875,9 @@ setInterval(_aquecerScript, 4 * 60 * 1000);
 // 2) o usuario clica no botao "Buscar agora".
 // Nunca busca sozinho em segundo plano / em intervalo.
 const STORAGE_URL_PENDENTES = 'bipador-url-pendentes-v1';
-let URL_SCRIPT_PENDENTES = localStorage.getItem(STORAGE_URL_PENDENTES) || '';
+const URL_PADRAO_PENDENTES = 'https://script.google.com/macros/s/AKfycbwPRm0OaaSxACBPpKvR53fgEetzm6l9_pmtrUoOmNHCDCwGCc3KUadX0Rk9zSW3bVFt/exec';
+let URL_SCRIPT_PENDENTES = localStorage.getItem(STORAGE_URL_PENDENTES) || URL_PADRAO_PENDENTES;
+if (!localStorage.getItem(STORAGE_URL_PENDENTES)) localStorage.setItem(STORAGE_URL_PENDENTES, URL_PADRAO_PENDENTES);
 let _semPrateleiraLista = null;
 let _semPrateleiraAberto = false;
 let _perguntouSemPrateleira = false;
