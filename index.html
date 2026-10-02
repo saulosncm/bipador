@@ -36,6 +36,14 @@ input:disabled { background: #f1f3f5; }
 .log-item:last-child { border-bottom: none; }
 .log-item .code { font-family: monospace; color: #495057; word-break: break-all; }
 .log-item .pr { background: #2d3277; color: #fff; padding: 4px 8px; border-radius: 4px; font-weight: 700; flex-shrink: 0; font-size: 12px; }
+.tabs { display: flex; gap: 8px; margin-bottom: 16px; }
+.tab-btn { flex: 1; padding: 12px; font-size: 14px; font-weight: 700; border: none; border-radius: 8px; background: #fff; color: #868e96; cursor: pointer; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
+.tab-btn.active { background: #2d3277; color: #fff; }
+select { width: 100%; padding: 14px; font-size: 16px; border: 3px solid #dee2e6; border-radius: 8px; font-family: inherit; background: #fff; }
+select:focus { outline: none; border-color: #3483fa; }
+.verif-item.novo { background: #fff5f5; border-left: 3px solid #ff8787; }
+.verif-item.corrigido { background: #fff9db; border-left: 3px solid #ffd43b; }
+.verif-item.correto { background: #f8f9fa; border-left: 3px solid #ced4da; }
 </style>
 </head>
 <body>
@@ -63,6 +71,11 @@ input:disabled { background: #f1f3f5; }
   <div id="operador-display"></div>
   <div id="fila-indicator" style="color:#1864ab;font-weight:600"></div>
 </div>
+<div class="tabs">
+  <button id="tab-bipagem" class="tab-btn active" onclick="mostrarAba('bipagem')">📦 Bipagem</button>
+  <button id="tab-verificacao" class="tab-btn" onclick="mostrarAba('verificacao')">🔍 Verificação</button>
+</div>
+<div id="view-bipagem">
 <div class="grid-2col">
 <div>
   <div class="card">
@@ -91,9 +104,29 @@ input:disabled { background: #f1f3f5; }
   <div class="log" id="lista-bips" style="max-height:520px"><div style="color:#adb5bd;text-align:center;padding:20px">Nada ainda…</div></div>
 </div>
 </div>
+</div>
+<div id="view-verificacao" style="display:none">
+  <div class="card">
+    <div class="step" id="verif-s1">1. Selecione a prateleira para conferir</div>
+    <select id="verif-select-prateleira">
+      <option value="">— Escolha uma prateleira —</option>
+    </select>
+    <div style="height: 14px"></div>
+    <div class="step" id="verif-s2" style="opacity:0.4">2. Bipe os pacotes desta prateleira</div>
+    <input type="text" id="verif-pacote" placeholder="Bipe o código do pacote" autocomplete="off" disabled>
+    <div class="feedback idle" id="verif-fb">Selecione uma prateleira para começar…</div>
+  </div>
+  <div class="stats">
+    <div class="stat" style="background:#e7f5ff"><div class="n" id="verif-cnt-conferidos" style="color:#1864ab">0</div><div class="l">✅ Conferidos</div></div>
+    <div class="stat" style="background:#fff9db"><div class="n" id="verif-cnt-corrigidos" style="color:#846503">0</div><div class="l">🔁 Corrigidos</div></div>
+    <div class="stat" style="background:#ffe3e3"><div class="n" id="verif-cnt-novos" style="color:#c92a2a">0</div><div class="l">🆕 Novos</div></div>
+  </div>
+  <div class="step" style="background:#f1f3f5;color:#495057;margin-top:16px">📋 Histórico da conferência desta prateleira</div>
+  <div class="log" id="lista-verif" style="max-height:400px"><div style="color:#adb5bd;text-align:center;padding:20px">Nada ainda…</div></div>
+</div>
 <div class="config">
 <a onclick="configurar()">⚙️ Configurar URL do script</a> &nbsp;·&nbsp;
-<span style="color:#adb5bd">v15.4 (5 tentativas, backoff 20/40/80/160s, retry ao voltar pra aba)</span>
+<span style="color:#adb5bd">v15.5 (5 tentativas, backoff 20/40/80/160s, retry ao voltar pra aba · + aba Verificação)</span>
 </div>
 </div>
 <script>
@@ -816,6 +849,193 @@ function _aquecerScript() {
 }
 _aquecerScript();
 setInterval(_aquecerScript, 4 * 60 * 1000);
+
+// ===== ABAS (Bipagem / Verificação) =====
+// Troca simples de visualização. Nao remove nem reseta nada da aba de
+// bipagem — ela so fica escondida (display:none), o estado dela continua intacto.
+function mostrarAba(nome) {
+  const viewBip = document.getElementById('view-bipagem');
+  const viewVerif = document.getElementById('view-verificacao');
+  const tabBip = document.getElementById('tab-bipagem');
+  const tabVerif = document.getElementById('tab-verificacao');
+  if (nome === 'verificacao') {
+    viewBip.style.display = 'none';
+    viewVerif.style.display = 'block';
+    tabBip.classList.remove('active');
+    tabVerif.classList.add('active');
+    const sel = document.getElementById('verif-select-prateleira');
+    if (sel && sel.value) document.getElementById('verif-pacote').focus();
+  } else {
+    viewVerif.style.display = 'none';
+    viewBip.style.display = 'block';
+    tabVerif.classList.remove('active');
+    tabBip.classList.add('active');
+    inP.focus();
+  }
+}
+window.mostrarAba = mostrarAba;
+
+// ===== VERIFICAÇÃO / AUDITORIA DE PRATELEIRA =====
+// Reaproveita EXATAMENTE o mesmo endpoint do Apps Script usado pelo fluxo
+// normal de bipagem (mesmo payload {pacote, prateleira, operador}). O proprio
+// backend ja faz a logica de: nao existe -> cadastra; existe em outra
+// prateleira -> corrige (move) sozinho. Aqui so interpretamos a resposta
+// (atualizado / moved / prateleiraAnterior) pra decidir destaque/som/contador.
+// NENHUMA alteracao foi feita no Apps Script nem no fluxo salvar()/enviarBip().
+let _verifPrateleira = '';
+let _verifStats = { conferidos: 0, corrigidos: 0, novos: 0 };
+let _verifLog = [];
+let _verifNextId = 1;
+let _verifEnviando = false;
+
+(function _popularSelectVerificacao() {
+  const sel = document.getElementById('verif-select-prateleira');
+  if (!sel) return;
+  PRATELEIRAS_VALIDAS.forEach(p => {
+    const op = document.createElement('option');
+    op.value = p;
+    op.textContent = p;
+    sel.appendChild(op);
+  });
+})();
+
+function setVerifFeedback(tipo, msg) {
+  const el = document.getElementById('verif-fb');
+  if (!el) return;
+  el.className = 'feedback ' + tipo;
+  el.textContent = msg;
+}
+
+const verifSelect = document.getElementById('verif-select-prateleira');
+const verifInput = document.getElementById('verif-pacote');
+
+if (verifSelect) {
+  verifSelect.addEventListener('change', () => {
+    _verifPrateleira = verifSelect.value;
+    const s1v = document.getElementById('verif-s1');
+    const s2v = document.getElementById('verif-s2');
+    if (_verifPrateleira) {
+      s1v.classList.add('done');
+      s2v.style.opacity = '1';
+      verifInput.disabled = false;
+      // Reinicia contadores ao trocar de prateleira (conferencia e por prateleira).
+      _verifStats = { conferidos: 0, corrigidos: 0, novos: 0 };
+      _verifLog = [];
+      _renderVerifStats();
+      _renderVerifLog();
+      setVerifFeedback('idle', 'Bipe os pacotes de "' + _verifPrateleira + '"…');
+      verifInput.value = '';
+      verifInput.focus();
+    } else {
+      s1v.classList.remove('done');
+      s2v.style.opacity = '0.4';
+      verifInput.disabled = true;
+      setVerifFeedback('idle', 'Selecione uma prateleira para começar…');
+    }
+  });
+}
+
+if (verifInput) {
+  verifInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      const v = verifInput.value.trim();
+      if (!v || _verifEnviando) return;
+      verificarPacote(v);
+    }
+  });
+}
+
+async function verificarPacote(pacote) {
+  if (!_verifPrateleira) { setVerifFeedback('error', '❌ Selecione a prateleira primeiro'); return; }
+  if (!_operador) { setVerifFeedback('error', '❌ Selecione o operador antes de bipar'); _abrirOperadorGate(); return; }
+  if (!URL_SCRIPT) { setVerifFeedback('error', '⚙️ Configure a URL do script primeiro!'); return; }
+
+  _verifEnviando = true;
+  verifInput.disabled = true;
+  setVerifFeedback('idle', '⏳ Verificando ' + pacote + '…');
+
+  try {
+    const resp = await fetch(URL_SCRIPT, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify({ pacote: pacote, prateleira: _verifPrateleira, operador: _operador })
+    });
+    const data = await resp.json();
+
+    if (data.ok) {
+      let tipo, msg;
+      if (!data.atualizado) {
+        // Pacote nao tinha cadastro -> foi incluido nesta prateleira agora.
+        tipo = 'novo';
+        _verifStats.novos++;
+        msg = '🆕 Novo cadastro: ' + pacote + ' → ' + _verifPrateleira;
+        setVerifFeedback('warn', msg);
+        beep('warn');
+      } else if (data.moved) {
+        // Estava em outra prateleira -> o backend ja corrigiu sozinho.
+        tipo = 'corrigido';
+        _verifStats.corrigidos++;
+        msg = '🔁 Corrigido: ' + pacote + ' estava em "' + (data.prateleiraAnterior || '?') + '", agora em "' + _verifPrateleira + '"';
+        setVerifFeedback('warn', msg);
+        beep('warn');
+      } else {
+        // Ja estava cadastrado corretamente nesta prateleira: sem destaque, so conta.
+        tipo = 'correto';
+        _verifStats.conferidos++;
+        msg = '✅ Conferido: ' + pacote;
+        setVerifFeedback('success', msg);
+      }
+      _verifLog.unshift({ id: _verifNextId++, pacote: pacote, tipo: tipo, hora: new Date(), prateleiraAnterior: data.prateleiraAnterior || '' });
+      _renderVerifStats();
+      _renderVerifLog();
+    } else {
+      setVerifFeedback('error', '❌ ' + (data.erro || 'Erro desconhecido'));
+      beep('err');
+    }
+  } catch (err) {
+    setVerifFeedback('error', '❌ Falha de conexão — tente bipar novamente');
+    beep('err');
+  } finally {
+    _verifEnviando = false;
+    verifInput.value = '';
+    verifInput.disabled = false;
+    verifInput.focus();
+  }
+}
+window.verificarPacote = verificarPacote;
+
+function _renderVerifStats() {
+  const elC = document.getElementById('verif-cnt-conferidos');
+  const elR = document.getElementById('verif-cnt-corrigidos');
+  const elN = document.getElementById('verif-cnt-novos');
+  if (elC) elC.textContent = _verifStats.conferidos;
+  if (elR) elR.textContent = _verifStats.corrigidos;
+  if (elN) elN.textContent = _verifStats.novos;
+}
+
+function _renderVerifLog() {
+  const log = document.getElementById('lista-verif');
+  if (!log) return;
+  if (_verifLog.length === 0) {
+    log.innerHTML = '<div style="color:#adb5bd;text-align:center;padding:20px">Nada ainda…</div>';
+    return;
+  }
+  const icones = { novo: '🆕', corrigido: '🔁', correto: '✅' };
+  log.innerHTML = _verifLog.slice(0, 50).map(v => {
+    const hora = v.hora.toTimeString().slice(0, 5);
+    const detalhe = v.tipo === 'corrigido' && v.prateleiraAnterior
+      ? '<div style="font-size:11px;color:#868e96">estava em "' + escapeHtml(v.prateleiraAnterior) + '"</div>'
+      : '';
+    return '<div class="log-item verif-item ' + v.tipo + '" style="padding-left:10px">'
+         + '<div style="flex:1;min-width:0">'
+         +   '<div class="code">' + icones[v.tipo] + ' ' + escapeHtml(v.pacote) + '</div>'
+         +   '<div style="font-size:11px;color:#868e96">' + hora + '</div>'
+         +   detalhe
+         + '</div>'
+         + '</div>';
+  }).join('');
+}
 
 </script>
 </body>
