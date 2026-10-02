@@ -95,6 +95,13 @@ select:focus { outline: none; border-color: #3483fa; }
     <div class="stat" style="background:#e7f5ff"><div class="n" id="cnt-enviando" style="color:#1864ab">0</div><div class="l">⏳ Enviando</div></div>
     <div class="stat" style="background:#ffe3e3"><div class="n" id="cnt-falhas" style="color:#c92a2a">0</div><div class="l">❌ Falhas</div></div>
   </div>
+  <div class="card" id="card-sem-prateleira" style="margin-top:16px;cursor:pointer" onclick="_toggleSemPrateleira()">
+    <div style="display:flex;justify-content:space-between;align-items:center">
+      <div class="step" style="background:#fff3bf;color:#846503;margin-bottom:0">📭 Sem prateleira: <span id="cnt-sem-prateleira">—</span></div>
+      <span id="sem-prateleira-toggle-icon" style="color:#868e96;font-size:18px">▾</span>
+    </div>
+    <div id="lista-sem-prateleira" style="display:none;margin-top:10px;max-height:240px;overflow-y:auto;font-family:monospace;font-size:13px;color:#495057" onclick="event.stopPropagation()"></div>
+  </div>
   <div style="margin-top:16px;display:flex;gap:8px;justify-content:center">
     <button onclick="beep('ok')" style="padding:8px 12px;border:1px solid #2b8a3e;background:#d3f9d8;color:#2b8a3e;border-radius:6px;cursor:pointer;font-weight:600">🔊 Testar sucesso</button>
     <button onclick="beep('warn')" style="padding:8px 12px;border:1px solid #846503;background:#fff9db;color:#846503;border-radius:6px;cursor:pointer;font-weight:600">🔊 Testar aviso</button>
@@ -857,6 +864,53 @@ function _aquecerScript() {
 }
 _aquecerScript();
 setInterval(_aquecerScript, 4 * 60 * 1000);
+
+// ===== PACOTES SEM PRATELEIRA =====
+// So-leitura: busca na planilha (coluna B com pacote preenchido e coluna C
+// vazia) via um endpoint NOVO e opcional no Apps Script (?action=pendentes).
+// Se o backend ainda nao tiver essa rota implantada, falha em silencio e
+// o painel so fica mostrando "—" — nao quebra nada do resto do app.
+let _semPrateleiraLista = [];
+let _semPrateleiraAberto = false;
+
+async function _carregarSemPrateleira() {
+  if (!URL_SCRIPT) return;
+  try {
+    const sep = URL_SCRIPT.indexOf('?') === -1 ? '?' : '&';
+    const resp = await fetch(URL_SCRIPT + sep + 'action=pendentes', { method: 'GET', cache: 'no-store' });
+    const data = await resp.json();
+    if (data && data.ok && Array.isArray(data.pendentes)) {
+      _semPrateleiraLista = data.pendentes;
+      const cnt = document.getElementById('cnt-sem-prateleira');
+      if (cnt) cnt.textContent = _semPrateleiraLista.length;
+      _renderSemPrateleira();
+    }
+  } catch (e) { /* silencioso: nao atrapalha o fluxo principal de bipagem */ }
+}
+
+function _toggleSemPrateleira() {
+  _semPrateleiraAberto = !_semPrateleiraAberto;
+  const el = document.getElementById('lista-sem-prateleira');
+  const icon = document.getElementById('sem-prateleira-toggle-icon');
+  if (el) el.style.display = _semPrateleiraAberto ? 'block' : 'none';
+  if (icon) icon.textContent = _semPrateleiraAberto ? '▴' : '▾';
+}
+window._toggleSemPrateleira = _toggleSemPrateleira;
+
+function _renderSemPrateleira() {
+  const el = document.getElementById('lista-sem-prateleira');
+  if (!el) return;
+  if (_semPrateleiraLista.length === 0) {
+    el.innerHTML = '<div style="color:#adb5bd;padding:6px 0">Nenhum pacote sem prateleira 🎉</div>';
+    return;
+  }
+  el.innerHTML = _semPrateleiraLista.map(p =>
+    '<div style="padding:4px 0;border-bottom:1px solid #f1f3f5">' + escapeHtml(p) + '</div>'
+  ).join('');
+}
+
+setTimeout(_carregarSemPrateleira, 1500);
+setInterval(_carregarSemPrateleira, 5 * 60 * 1000);
 
 // ===== ABAS (Bipagem / Verificação) =====
 // Troca simples de visualização. Nao remove nem reseta nada da aba de
