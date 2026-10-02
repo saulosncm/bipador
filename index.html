@@ -41,9 +41,11 @@ input:disabled { background: #f1f3f5; }
 .tab-btn.active { background: #2d3277; color: #fff; }
 select { width: 100%; padding: 14px; font-size: 16px; border: 3px solid #dee2e6; border-radius: 8px; font-family: inherit; background: #fff; }
 select:focus { outline: none; border-color: #3483fa; }
+.verif-item.enviando { background: #e7f5ff; border-left: 3px solid #74c0fc; }
 .verif-item.novo { background: #fff5f5; border-left: 3px solid #ff8787; }
 .verif-item.corrigido { background: #fff9db; border-left: 3px solid #ffd43b; }
 .verif-item.correto { background: #f8f9fa; border-left: 3px solid #ced4da; }
+.verif-item.erro { background: #fff5f5; border-left: 3px solid #c92a2a; }
 </style>
 </head>
 <body>
@@ -106,6 +108,8 @@ select:focus { outline: none; border-color: #3483fa; }
 </div>
 </div>
 <div id="view-verificacao" style="display:none">
+<div class="grid-2col">
+<div>
   <div class="card">
     <div class="step" id="verif-s1">1. Selecione a prateleira para conferir</div>
     <select id="verif-select-prateleira">
@@ -121,8 +125,12 @@ select:focus { outline: none; border-color: #3483fa; }
     <div class="stat" style="background:#fff9db"><div class="n" id="verif-cnt-corrigidos" style="color:#846503">0</div><div class="l">🔁 Corrigidos</div></div>
     <div class="stat" style="background:#ffe3e3"><div class="n" id="verif-cnt-novos" style="color:#c92a2a">0</div><div class="l">🆕 Novos</div></div>
   </div>
-  <div class="step" style="background:#f1f3f5;color:#495057;margin-top:16px">📋 Histórico da conferência desta prateleira</div>
-  <div class="log" id="lista-verif" style="max-height:400px"><div style="color:#adb5bd;text-align:center;padding:20px">Nada ainda…</div></div>
+</div>
+<div class="col-direita">
+  <div class="step" style="background:#f1f3f5;color:#495057">📋 Histórico da conferência desta prateleira</div>
+  <div class="log" id="lista-verif" style="max-height:520px"><div style="color:#adb5bd;text-align:center;padding:20px">Nada ainda…</div></div>
+</div>
+</div>
 </div>
 <div class="config">
 <a onclick="configurar()">⚙️ Configurar URL do script</a> &nbsp;·&nbsp;
@@ -886,7 +894,6 @@ let _verifPrateleira = '';
 let _verifStats = { conferidos: 0, corrigidos: 0, novos: 0 };
 let _verifLog = [];
 let _verifNextId = 1;
-let _verifEnviando = false;
 
 (function _popularSelectVerificacao() {
   const sel = document.getElementById('verif-select-prateleira');
@@ -940,70 +947,95 @@ if (verifInput) {
     if (e.key === 'Enter') {
       e.preventDefault();
       const v = verifInput.value.trim();
-      if (!v || _verifEnviando) return;
+      if (!v) return;
       verificarPacote(v);
     }
   });
 }
 
-async function verificarPacote(pacote) {
+// ===== FIRE-AND-FORGET (igual a aba Bipagem) =====
+// verificarPacote() so registra o item na lista e libera o campo na hora.
+// O envio/verificacao real acontece em segundo plano em _enviarVerificacao(),
+// que atualiza o mesmo item da lista quando a resposta chega.
+function verificarPacote(pacote) {
   if (!_verifPrateleira) { setVerifFeedback('error', '❌ Selecione a prateleira primeiro'); return; }
   if (!_operador) { setVerifFeedback('error', '❌ Selecione o operador antes de bipar'); _abrirOperadorGate(); return; }
   if (!URL_SCRIPT) { setVerifFeedback('error', '⚙️ Configure a URL do script primeiro!'); return; }
 
-  _verifEnviando = true;
-  verifInput.disabled = true;
+  const entry = {
+    id: _verifNextId++,
+    pacote: pacote,
+    tipo: 'enviando',
+    hora: new Date(),
+    msg: '',
+    prateleiraAnterior: ''
+  };
+  _verifLog.unshift(entry);
+  _renderVerifLog();
   setVerifFeedback('idle', '⏳ Verificando ' + pacote + '…');
 
+  // Libera o campo imediatamente pro proximo bip.
+  verifInput.value = '';
+  verifInput.focus();
+
+  _enviarVerificacao(entry);
+}
+window.verificarPacote = verificarPacote;
+
+async function _enviarVerificacao(entry) {
   try {
     const resp = await fetch(URL_SCRIPT, {
       method: 'POST',
       headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-      body: JSON.stringify({ pacote: pacote, prateleira: _verifPrateleira, operador: _operador })
+      body: JSON.stringify({ pacote: entry.pacote, prateleira: _verifPrateleira, operador: _operador })
     });
     const data = await resp.json();
 
     if (data.ok) {
-      let tipo, msg;
       if (!data.atualizado) {
         // Pacote nao tinha cadastro -> foi incluido nesta prateleira agora.
-        tipo = 'novo';
+        entry.tipo = 'novo';
         _verifStats.novos++;
-        msg = '🆕 Novo cadastro: ' + pacote + ' → ' + _verifPrateleira;
-        setVerifFeedback('warn', msg);
+        setVerifFeedback('warn', '🆕 Novo cadastro: ' + entry.pacote + ' → ' + _verifPrateleira);
         beep('warn');
       } else if (data.moved) {
         // Estava em outra prateleira -> o backend ja corrigiu sozinho.
-        tipo = 'corrigido';
+        entry.tipo = 'corrigido';
+        entry.prateleiraAnterior = data.prateleiraAnterior || '';
         _verifStats.corrigidos++;
-        msg = '🔁 Corrigido: ' + pacote + ' estava em "' + (data.prateleiraAnterior || '?') + '", agora em "' + _verifPrateleira + '"';
-        setVerifFeedback('warn', msg);
+        setVerifFeedback('warn', '🔁 Corrigido: ' + entry.pacote + ' estava em "' + (data.prateleiraAnterior || '?') + '", agora em "' + _verifPrateleira + '"');
         beep('warn');
       } else {
         // Ja estava cadastrado corretamente nesta prateleira: sem destaque, so conta.
-        tipo = 'correto';
+        entry.tipo = 'correto';
         _verifStats.conferidos++;
-        msg = '✅ Conferido: ' + pacote;
-        setVerifFeedback('success', msg);
+        setVerifFeedback('success', '✅ Conferido: ' + entry.pacote);
       }
-      _verifLog.unshift({ id: _verifNextId++, pacote: pacote, tipo: tipo, hora: new Date(), prateleiraAnterior: data.prateleiraAnterior || '' });
-      _renderVerifStats();
-      _renderVerifLog();
     } else {
-      setVerifFeedback('error', '❌ ' + (data.erro || 'Erro desconhecido'));
+      entry.tipo = 'erro';
+      entry.msg = data.erro || 'Erro desconhecido';
+      setVerifFeedback('error', '❌ ' + entry.msg);
       beep('err');
     }
   } catch (err) {
-    setVerifFeedback('error', '❌ Falha de conexão — tente bipar novamente');
+    entry.tipo = 'erro';
+    entry.msg = err.message || 'sem conexão';
+    setVerifFeedback('error', '❌ Falha de conexão ao verificar ' + entry.pacote);
     beep('err');
-  } finally {
-    _verifEnviando = false;
-    verifInput.value = '';
-    verifInput.disabled = false;
-    verifInput.focus();
   }
+  _renderVerifStats();
+  _renderVerifLog();
 }
-window.verificarPacote = verificarPacote;
+
+function reenviarVerificacao(id) {
+  const entry = _verifLog.find(v => v.id === id);
+  if (!entry) return;
+  entry.tipo = 'enviando';
+  entry.msg = '';
+  _renderVerifLog();
+  _enviarVerificacao(entry);
+}
+window.reenviarVerificacao = reenviarVerificacao;
 
 function _renderVerifStats() {
   const elC = document.getElementById('verif-cnt-conferidos');
@@ -1021,11 +1053,14 @@ function _renderVerifLog() {
     log.innerHTML = '<div style="color:#adb5bd;text-align:center;padding:20px">Nada ainda…</div>';
     return;
   }
-  const icones = { novo: '🆕', corrigido: '🔁', correto: '✅' };
+  const icones = { enviando: '⏳', novo: '🆕', corrigido: '🔁', correto: '✅', erro: '❌' };
   log.innerHTML = _verifLog.slice(0, 50).map(v => {
     const hora = v.hora.toTimeString().slice(0, 5);
     const detalhe = v.tipo === 'corrigido' && v.prateleiraAnterior
       ? '<div style="font-size:11px;color:#868e96">estava em "' + escapeHtml(v.prateleiraAnterior) + '"</div>'
+      : (v.tipo === 'erro' && v.msg ? '<div style="font-size:11px;color:#c92a2a">' + escapeHtml(v.msg) + '</div>' : '');
+    const reenviar = v.tipo === 'erro'
+      ? '<button onclick="reenviarVerificacao(' + v.id + ')" style="padding:4px 10px;border:1px solid #c92a2a;background:#fff;color:#c92a2a;border-radius:4px;cursor:pointer;font-weight:600;font-size:12px">↻ Reenviar</button>'
       : '';
     return '<div class="log-item verif-item ' + v.tipo + '" style="padding-left:10px">'
          + '<div style="flex:1;min-width:0">'
@@ -1033,6 +1068,7 @@ function _renderVerifLog() {
          +   '<div style="font-size:11px;color:#868e96">' + hora + '</div>'
          +   detalhe
          + '</div>'
+         + reenviar
          + '</div>';
   }).join('');
 }
