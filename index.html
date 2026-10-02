@@ -95,12 +95,12 @@ select:focus { outline: none; border-color: #3483fa; }
     <div class="stat" style="background:#e7f5ff"><div class="n" id="cnt-enviando" style="color:#1864ab">0</div><div class="l">⏳ Enviando</div></div>
     <div class="stat" style="background:#ffe3e3"><div class="n" id="cnt-falhas" style="color:#c92a2a">0</div><div class="l">❌ Falhas</div></div>
   </div>
-  <div class="card" id="card-sem-prateleira" style="margin-top:16px">
+  <div class="card sem-prateleira-card" style="margin-top:16px">
     <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap">
-      <div class="step" id="label-sem-prateleira" style="background:#fff3bf;color:#846503;margin-bottom:0;cursor:pointer" onclick="_toggleSemPrateleira()">📭 Sem prateleira: <span id="cnt-sem-prateleira">?</span></div>
+      <div class="step" style="background:#fff3bf;color:#846503;margin-bottom:0;cursor:pointer" onclick="_toggleSemPrateleira()">📭 Sem prateleira: <span class="cnt-sem-prateleira">?</span></div>
       <button onclick="_carregarSemPrateleira()" style="padding:6px 12px;border:1px solid #846503;background:#fff;color:#846503;border-radius:6px;cursor:pointer;font-weight:600;font-size:12px;white-space:nowrap">🔎 Buscar agora</button>
     </div>
-    <div id="lista-sem-prateleira" style="display:none;margin-top:10px;max-height:240px;overflow-y:auto;font-family:monospace;font-size:13px;color:#495057"></div>
+    <div class="lista-sem-prateleira" style="display:none;margin-top:10px;max-height:240px;overflow-y:auto;font-family:monospace;font-size:13px;color:#495057"></div>
     <div style="margin-top:6px;font-size:11px;color:#adb5bd;text-align:right">
       <a onclick="_configurarUrlPendentes()" style="color:#868e96;cursor:pointer;text-decoration:underline">configurar URL</a>
     </div>
@@ -134,6 +134,13 @@ select:focus { outline: none; border-color: #3483fa; }
     <div class="stat" style="background:#e7f5ff"><div class="n" id="verif-cnt-conferidos" style="color:#1864ab">0</div><div class="l">✅ Conferidos</div></div>
     <div class="stat" style="background:#fff9db"><div class="n" id="verif-cnt-corrigidos" style="color:#846503">0</div><div class="l">🔁 Corrigidos</div></div>
     <div class="stat" style="background:#ffe3e3"><div class="n" id="verif-cnt-novos" style="color:#c92a2a">0</div><div class="l">🆕 Novos</div></div>
+  </div>
+  <div class="card sem-prateleira-card" style="margin-top:16px">
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap">
+      <div class="step" style="background:#fff3bf;color:#846503;margin-bottom:0;cursor:pointer" onclick="_toggleSemPrateleira()">📭 Sem prateleira: <span class="cnt-sem-prateleira">?</span></div>
+      <button onclick="_carregarSemPrateleira()" style="padding:6px 12px;border:1px solid #846503;background:#fff;color:#846503;border-radius:6px;cursor:pointer;font-weight:600;font-size:12px;white-space:nowrap">🔎 Buscar agora</button>
+    </div>
+    <div class="lista-sem-prateleira" style="display:none;margin-top:10px;max-height:240px;overflow-y:auto;font-family:monospace;font-size:13px;color:#495057"></div>
   </div>
 </div>
 <div class="col-direita">
@@ -892,27 +899,36 @@ function _configurarUrlPendentes() {
 }
 window._configurarUrlPendentes = _configurarUrlPendentes;
 
+// Os cards de "Sem prateleira" existem tanto na aba Bipagem quanto na aba
+// Verificação (classes .cnt-sem-prateleira / .lista-sem-prateleira), mas
+// compartilham o MESMO estado — buscar em qualquer uma das duas abas
+// atualiza as duas ao mesmo tempo.
+function _marcarCarregandoSemPrateleira() {
+  document.querySelectorAll('.cnt-sem-prateleira').forEach(el => el.textContent = '...');
+}
+function _marcarErroSemPrateleira() {
+  document.querySelectorAll('.cnt-sem-prateleira').forEach(el => el.textContent = '?');
+}
+
 async function _carregarSemPrateleira() {
   if (!URL_SCRIPT_PENDENTES) {
     alert('Configure primeiro a URL do script "Pacotes sem prateleira" (link "configurar URL" abaixo do botão).');
     return;
   }
-  const cnt = document.getElementById('cnt-sem-prateleira');
-  if (cnt) cnt.textContent = '...';
+  _marcarCarregandoSemPrateleira();
   try {
     const resp = await fetch(URL_SCRIPT_PENDENTES, { method: 'GET', cache: 'no-store' });
     const data = await resp.json();
     if (data && data.ok && Array.isArray(data.pendentes)) {
       _semPrateleiraLista = data.pendentes;
-      if (cnt) cnt.textContent = _semPrateleiraLista.length;
       _semPrateleiraAberto = true;
       _renderSemPrateleira();
     } else {
-      if (cnt) cnt.textContent = '?';
+      _marcarErroSemPrateleira();
       alert('Nao foi possivel buscar: ' + (data && data.erro ? data.erro : 'resposta inesperada do script'));
     }
   } catch (e) {
-    if (cnt) cnt.textContent = '?';
+    _marcarErroSemPrateleira();
     alert('Falha de conexao ao buscar pacotes sem prateleira.');
   }
 }
@@ -926,17 +942,20 @@ function _toggleSemPrateleira() {
 window._toggleSemPrateleira = _toggleSemPrateleira;
 
 function _renderSemPrateleira() {
-  const el = document.getElementById('lista-sem-prateleira');
-  if (!el) return;
-  el.style.display = _semPrateleiraAberto ? 'block' : 'none';
-  if (!_semPrateleiraAberto) return;
-  if (!_semPrateleiraLista || _semPrateleiraLista.length === 0) {
-    el.innerHTML = '<div style="color:#adb5bd;padding:6px 0">Nenhum pacote sem prateleira 🎉</div>';
-    return;
-  }
-  el.innerHTML = _semPrateleiraLista.map(p =>
-    '<div style="padding:4px 0;border-bottom:1px solid #f1f3f5">' + escapeHtml(p) + '</div>'
-  ).join('');
+  document.querySelectorAll('.cnt-sem-prateleira').forEach(el => {
+    el.textContent = _semPrateleiraLista ? _semPrateleiraLista.length : '?';
+  });
+  document.querySelectorAll('.lista-sem-prateleira').forEach(el => {
+    el.style.display = _semPrateleiraAberto ? 'block' : 'none';
+    if (!_semPrateleiraAberto) return;
+    if (!_semPrateleiraLista || _semPrateleiraLista.length === 0) {
+      el.innerHTML = '<div style="color:#adb5bd;padding:6px 0">Nenhum pacote sem prateleira 🎉</div>';
+      return;
+    }
+    el.innerHTML = _semPrateleiraLista.map(p =>
+      '<div style="padding:4px 0;border-bottom:1px solid #f1f3f5">' + escapeHtml(p) + '</div>'
+    ).join('');
+  });
 }
 
 // Pergunta UMA vez por sessao, assim que login + operador ja estiverem
